@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Swords, PauseCircle, PlayCircle, CheckCircle2, ShieldAlert, Cpu, Bot, User, Brain, AlertTriangle } from 'lucide-react';
+import { X, Swords, PauseCircle, PlayCircle, CheckCircle2, ShieldAlert, Cpu, Bot, User, Brain, AlertTriangle, Power } from 'lucide-react';
 import { Expert, WarRoomMessage } from '../types';
 import { getWarRoomTurn } from '../services/geminiService';
 
@@ -15,14 +15,34 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
   const [isConsensusReached, setIsConsensusReached] = useState(false);
   const [messages, setMessages] = useState<WarRoomMessage[]>([]);
   const [turnCount, setTurnCount] = useState(0);
+  const [activeExpertIds, setActiveExpertIds] = useState<Set<string>>(new Set());
   
   const scrollRef = useRef<HTMLDivElement>(null);
-  const maxTurns = 10; // Safety limit
+  const maxTurns = 15;
+
+  // Initialize active experts
+  useEffect(() => {
+    if (isOpen) {
+        setActiveExpertIds(new Set(experts.map(e => e.id)));
+    }
+  }, [isOpen, experts]);
 
   // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const toggleExpert = (id: string) => {
+    setActiveExpertIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // Debate Loop
   useEffect(() => {
@@ -34,8 +54,17 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
         return;
       }
 
+      // Filter experts based on active set
+      const activeExperts = experts.filter(e => activeExpertIds.has(e.id));
+
+      if (activeExperts.length === 0) {
+        // No experts available to talk
+        setIsDebating(false);
+        return;
+      }
+
       try {
-        const turn = await getWarRoomTurn(topic, messages, experts);
+        const turn = await getWarRoomTurn(topic, messages, activeExperts);
         
         const newMessage: WarRoomMessage = {
           id: Math.random().toString(36).substr(2, 9),
@@ -69,7 +98,7 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
     }
 
     return () => clearTimeout(timeout);
-  }, [isDebating, turnCount, messages, isConsensusReached, topic, experts]);
+  }, [isDebating, turnCount, messages, isConsensusReached, topic, experts, activeExpertIds]);
 
   if (!isOpen) return null;
 
@@ -112,28 +141,49 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
         <div className="flex-1 flex overflow-hidden z-10">
           
           {/* Left: Experts List */}
-          <div className="w-64 bg-black/20 border-r border-gray-800 p-4 hidden md:flex flex-col gap-3 overflow-y-auto">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Participants</h3>
+          <div className="w-72 bg-black/20 border-r border-gray-800 p-4 hidden md:flex flex-col gap-3 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2">
+               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Participants</h3>
+               <span className="text-[10px] text-gray-600">{activeExpertIds.size} Active</span>
+            </div>
+            
             {experts.map(expert => {
-               // Is this expert currently speaking?
                const isSpeaking = messages.length > 0 && messages[messages.length - 1].speakerId === expert.id && isDebating;
+               const isActive = activeExpertIds.has(expert.id);
                
                return (
                 <div 
                   key={expert.id} 
+                  onClick={() => toggleExpert(expert.id)}
                   className={`
-                    p-3 rounded-lg border transition-all duration-300
-                    ${isSpeaking 
-                      ? 'bg-red-900/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' 
-                      : 'bg-gray-800/40 border-gray-700/50 opacity-60'
+                    p-3 rounded-lg border transition-all duration-300 cursor-pointer select-none relative group
+                    ${!isActive 
+                        ? 'bg-gray-900/40 border-gray-800 opacity-50 grayscale hover:opacity-70' 
+                        : isSpeaking 
+                          ? 'bg-red-900/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' 
+                          : 'bg-gray-800/40 border-gray-700/50 hover:bg-gray-800/60'
                     }
                   `}
                 >
-                  <div className="flex items-center gap-3 mb-1">
-                    <Bot className={`w-4 h-4 ${isSpeaking ? 'text-red-400' : 'text-gray-400'}`} />
-                    <span className={`text-sm font-bold ${isSpeaking ? 'text-white' : 'text-gray-300'}`}>{expert.name}</span>
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                        <Bot className={`w-4 h-4 flex-shrink-0 ${isSpeaking ? 'text-red-400' : isActive ? 'text-gray-400' : 'text-gray-600'}`} />
+                        <span className={`text-sm font-bold truncate ${isSpeaking ? 'text-white' : isActive ? 'text-gray-300' : 'text-gray-600'}`}>
+                           {expert.name}
+                        </span>
+                    </div>
+                    
+                    {/* Toggle Indicator */}
+                    <div className={`
+                       w-4 h-4 rounded-full flex items-center justify-center transition-colors
+                       ${isActive ? 'text-green-500' : 'text-gray-700'}
+                    `}>
+                       <Power className="w-3 h-3" />
+                    </div>
                   </div>
-                  <p className="text-[10px] text-gray-500 uppercase">{expert.type}</p>
+                  
+                  <p className="text-[10px] text-gray-500 uppercase truncate pr-4">{expert.type}</p>
+                  
                   {isSpeaking && <div className="mt-2 h-1 w-full bg-red-500/20 rounded-full overflow-hidden">
                     <div className="h-full bg-red-500 w-1/3 animate-[shimmer_1s_infinite]" />
                   </div>}
@@ -160,9 +210,15 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
                     placeholder="e.g. How do we scale the websocket service to 1M concurrent users?"
                     className="w-full bg-gray-900 border border-gray-700 text-white p-4 rounded-xl focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none text-lg placeholder:text-gray-600 mb-4"
                   />
+                  
+                  <div className="flex items-center justify-center gap-2 mb-6 text-sm text-gray-500">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    {activeExpertIds.size} Experts Ready
+                  </div>
+
                   <button 
                     onClick={handleStart}
-                    disabled={!topic.trim()}
+                    disabled={!topic.trim() || activeExpertIds.size === 0}
                     className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
                   >
                     <Swords className="w-5 h-5" />

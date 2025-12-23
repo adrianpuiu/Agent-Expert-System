@@ -16,7 +16,9 @@ import {
   Network,
   Swords,
   Headset,
-  Globe
+  Globe,
+  Terminal,
+  Code2
 } from 'lucide-react';
 import ExpertCard from './components/ExpertCard';
 import ExpertiseModal from './components/ExpertiseModal';
@@ -27,7 +29,7 @@ import TrainExpertModal from './components/TrainExpertModal';
 import WarRoomModal from './components/WarRoomModal';
 import VoiceCallModal from './components/VoiceCallModal';
 import TaskQueueWidget from './components/TaskQueueWidget';
-import { Expert, ExpertStatus, ExpertType, LogEntry, ChatMessage, ExpertiseHistory, AgentTask, TaskPriority, TaskStatus } from './types';
+import { Expert, ExpertStatus, ExpertType, LogEntry, ChatMessage, ExpertiseHistory, AgentTask, TaskPriority, TaskStatus, ToolLogData } from './types';
 import { chatWithExpert, selfImproveExpert, trainExpert as trainExpertService } from './services/geminiService';
 
 // Mock Initial Data (Used only if localStorage is empty)
@@ -800,8 +802,21 @@ const App: React.FC = () => {
     chatMessagesRef.current = chatMessages;
   }, [chatMessages]);
 
+  // --- Actions ---
+  const addLog = (expertId: string, expertName: string, action: LogEntry['action'], details: string, toolData?: ToolLogData) => {
+    const newLog: LogEntry = {
+      id: Math.random().toString(36).substr(2, 9),
+      expertId,
+      expertName,
+      action,
+      details,
+      timestamp: new Date().toISOString(),
+      toolData
+    };
+    setLogs(prev => [newLog, ...prev]);
+  };
+
   // --- Task Manager Logic ---
-  
   const addTask = (type: AgentTask['type'], priority: TaskPriority, expertId: string, description: string, payload: any) => {
     const newTask: AgentTask = {
       id: Math.random().toString(36).substr(2, 9),
@@ -846,6 +861,10 @@ const App: React.FC = () => {
         const expert = experts.find(e => e.id === nextTask.expertId);
         if (!expert) throw new Error("Expert not found");
 
+        const handleToolLog = (data: ToolLogData) => {
+          addLog(expert.id, expert.name, 'Tool Used', `Used ${data.toolName}`, data);
+        };
+
         // 3. Execute based on Type
         switch (nextTask.type) {
           case 'CHAT': {
@@ -864,7 +883,7 @@ const App: React.FC = () => {
                }));
             };
 
-            const response = await chatWithExpert(expert, message, history, experts, handleCollaborationStart);
+            const response = await chatWithExpert(expert, message, history, experts, handleCollaborationStart, handleToolLog);
             
             // Cleanup collaboration status after chat
             setExperts(prevExperts => prevExperts.map(e => {
@@ -892,10 +911,8 @@ const App: React.FC = () => {
                }]);
             }
             
-            // Log Tool Usage
-            if (response.sources && response.sources.length > 0) {
-               addLog(expert.id, expert.name, 'Tool Used', `Google Search: Found ${response.sources.length} citations`);
-            }
+            // Log Tool Usage for Search if returned in response but not caught by onToolLog (legacy check)
+            // But we prefer onToolLog now.
             
             addLog(expert.id, expert.name, 'Queried', `Answered: "${message.substring(0, 30)}..."`);
             break;
@@ -903,7 +920,7 @@ const App: React.FC = () => {
 
           case 'IMPROVE': {
              const { context } = nextTask.payload;
-             const result = await selfImproveExpert(expert, context);
+             const result = await selfImproveExpert(expert, context, handleToolLog);
              
              // Update Expert Data
              setExperts(prev => prev.map(e => {
@@ -925,11 +942,6 @@ const App: React.FC = () => {
               }
               return e;
              }));
-             
-             // Log Search during improvement
-             if (result.sources && result.sources.length > 0) {
-                addLog(expert.id, expert.name, 'Tool Used', `Google Search: Verified knowledge with ${result.sources.length} sources`);
-             }
              
              addLog(expert.id, expert.name, 'Self-Improved', result.summary);
              break;
@@ -983,20 +995,6 @@ const App: React.FC = () => {
     const interval = setInterval(processQueue, 500);
     return () => clearInterval(interval);
   }, [tasks, isQueueProcessing, experts, chattingExpert]); // Re-run when dependencies change
-
-  // --- Actions ---
-
-  const addLog = (expertId: string, expertName: string, action: LogEntry['action'], details: string) => {
-    const newLog: LogEntry = {
-      id: Math.random().toString(36).substr(2, 9),
-      expertId,
-      expertName,
-      action,
-      details,
-      timestamp: new Date().toISOString()
-    };
-    setLogs(prev => [newLog, ...prev]);
-  };
 
   const handleCreateNewExpert = (data: { name: string; type: ExpertType; description: string; expertise: string }) => {
     const newExpert: Expert = {
@@ -1373,7 +1371,7 @@ const App: React.FC = () => {
                </div>
                <div>
                   <h3 className="font-bold text-gray-900">Self-Improvement Log</h3>
-                  <p className="text-sm text-gray-500">Automatic expertise updates</p>
+                  <p className="text-sm text-gray-500">Automatic expertise updates & Tool Usage</p>
                </div>
              </div>
              
@@ -1386,7 +1384,7 @@ const App: React.FC = () => {
                  <div className="divide-y divide-gray-100">
                    {logs.map((log) => (
                      <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors flex items-start gap-4">
-                        <div className={`mt-1 w-2 h-2 rounded-full ${
+                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
                           log.action === 'Self-Improved' ? 'bg-green-500' :
                           log.action === 'Collaboration' ? 'bg-purple-500' :
                           log.action === 'Reverted' ? 'bg-yellow-500' :
@@ -1394,13 +1392,14 @@ const App: React.FC = () => {
                           log.action === 'Error' ? 'bg-red-500' :
                           'bg-blue-500'
                         }`} />
-                        <div className="flex-1">
+                        <div className="flex-1 w-full overflow-hidden">
                           <div className="flex justify-between mb-1">
                              <span className="font-medium text-gray-900">{log.expertName}</span>
                              <span className="text-xs text-gray-400">{new Date(log.timestamp).toLocaleTimeString()}</span>
                           </div>
-                          <p className="text-sm text-gray-600 mb-1">
-                            <span className={`uppercase text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded mr-2 flex inline-flex items-center gap-1 ${
+                          
+                          <div className="text-sm text-gray-600 mb-1">
+                            <span className={`uppercase text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded mr-2 inline-flex items-center gap-1 ${
                               log.action === 'Self-Improved' ? 'bg-green-100 text-green-700' :
                               log.action === 'Collaboration' ? 'bg-purple-100 text-purple-700' :
                               log.action === 'Reverted' ? 'bg-yellow-100 text-yellow-800' :
@@ -1408,11 +1407,31 @@ const App: React.FC = () => {
                               log.action === 'Error' ? 'bg-red-100 text-red-700' :
                               'bg-blue-100 text-blue-700'
                             }`}>
-                              {log.action === 'Tool Used' && <Globe className="w-3 h-3" />}
+                              {log.action === 'Tool Used' && <Terminal className="w-3 h-3" />}
                               {log.action}
                             </span>
                             {log.details}
-                          </p>
+                          </div>
+                          
+                          {/* Structured Tool Data Display */}
+                          {log.toolData && (
+                            <div className="mt-3 bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-300 border border-gray-800 shadow-inner overflow-hidden">
+                               <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-800 text-gray-500">
+                                  <Code2 className="w-3.5 h-3.5" />
+                                  <span>Function Call: <span className="text-orange-400">{log.toolData.toolName}()</span></span>
+                               </div>
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                     <span className="text-gray-500 uppercase tracking-wider text-[10px] block mb-1">Input</span>
+                                     <pre className="text-green-400 whitespace-pre-wrap break-words">{JSON.stringify(log.toolData.input, null, 2)}</pre>
+                                  </div>
+                                  <div>
+                                     <span className="text-gray-500 uppercase tracking-wider text-[10px] block mb-1">Output Summary</span>
+                                     <p className="text-blue-300 leading-relaxed whitespace-pre-wrap">{log.toolData.output}</p>
+                                  </div>
+                               </div>
+                            </div>
+                          )}
                         </div>
                      </div>
                    ))}
@@ -1458,31 +1477,9 @@ const App: React.FC = () => {
           isOpen={!!trainingExpert}
           onClose={() => setTrainingExpert(null)}
           expert={trainingExpert}
-          onTrainComplete={(id, exp, summary) => {
-            // Now we just queue it to be applied instead of applying directly in modal
-            // Wait, TrainExpertModal actually does the AI call. 
-            // We should use the handleQueueTraining method to properly queue the AI work.
-            // But the modal needs a text input.
-            // For now, to keep modal logic simple, we let modal do the AI, but we could have the modal *only* return the text, and we queue the task here.
-            // Refactoring modal is better design.
-          }}
+          onTrainComplete={(id, exp, summary) => handleQueueTraining(id, exp)}
         />
       )}
-      
-      {/* We need to override the TrainExpertModal logic to queue instead of execute immediately. 
-          For now, since TrainExpertModal is self-contained, we can't easily intercept without rewriting it.
-          Let's just update the onClose behavior or pass a custom handler.
-          Actually, I will just replace the TrainExpertModal usage with a custom one or update it in next iteration.
-          For now, I'll rely on the fact that I didn't change TrainExpertModal's internals to use queue, 
-          so Manual Training bypasses the queue in this exact version, but Self-Improvement and Chat use it.
-          
-          Correction: I'll actually fix TrainExpertModal props in App.tsx to use the new queue logic if possible, 
-          but TrainExpertModal does the API call internally. 
-          To do this right, I need to modify TrainExpertModal to NOT call API, but just return text. 
-          But the prompt didn't ask to rewrite the modal completely. 
-          I will leave Manual Training as "Immediate High Priority" (blocking) for now as users expect immediate feedback in that modal,
-          while background tasks are queued.
-      */}
 
       <CreateExpertModal
         isOpen={isCreateModalOpen}

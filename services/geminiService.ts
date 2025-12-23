@@ -1,5 +1,5 @@
 import { GoogleGenAI, FunctionDeclaration, Type, Tool, GenerateContentResponse } from "@google/genai";
-import { Expert, WarRoomMessage, SearchSource } from '../types';
+import { Expert, WarRoomMessage, SearchSource, ToolLogData } from '../types';
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
@@ -24,7 +24,16 @@ const withRetry = async <T>(operation: () => Promise<T>, retries = 3, delay = 20
     return await operation();
   } catch (error: any) {
     // Check for rate limit error (status 429 or code 429 or RESOURCE_EXHAUSTED)
-    const isRateLimit = error?.status === 429 || error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota');
+    // Enhanced check for nested error objects commonly returned by Google APIs
+    const isRateLimit = 
+      error?.status === 429 || 
+      error?.code === 429 || 
+      error?.error?.code === 429 || 
+      error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.message?.includes('429') || 
+      error?.message?.includes('quota') ||
+      error?.message?.includes('RESOURCE_EXHAUSTED');
     
     if (isRateLimit && retries > 0) {
       console.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} retries left)`);
@@ -48,7 +57,8 @@ export const chatWithExpert = async (
   userMessage: string, 
   history: { role: string; text: string }[],
   availableExperts: Expert[],
-  onCollaborationStart?: (partnerName: string, reason: string) => void
+  onCollaborationStart?: (partnerName: string, reason: string) => void,
+  onToolUse?: (data: ToolLogData) => void
 ): Promise<ChatResponse> => {
   try {
     const ai = getAiClient();
@@ -125,6 +135,16 @@ export const chatWithExpert = async (
       }
     }));
 
+    // Log Google Search if used
+    const searchSources = extractSources(firstResponse);
+    if (searchSources.length > 0 && onToolUse) {
+      onToolUse({
+        toolName: 'googleSearch',
+        input: { query: 'Implicit grounding query based on context' },
+        output: `Found ${searchSources.length} sources: ${searchSources.map(s => s.title).join(', ')}`
+      });
+    }
+
     // 3. Check for Function Call (Collaboration)
     const functionCalls = firstResponse.functionCalls;
 
@@ -145,6 +165,15 @@ export const chatWithExpert = async (
         );
 
         if (targetExpert) {
+          // Log Tool Use
+          if (onToolUse) {
+            onToolUse({
+              toolName: 'consult_expert',
+              input: { expertName, reason },
+              output: `Received mental model from ${targetExpert.name}`
+            });
+          }
+
           // 4. Second Pass: Generate Answer with Shared Knowledge
           // We keep Google Search enabled here too so it can ground the combined info if needed.
           const collaborationPrompt = `
@@ -185,7 +214,7 @@ export const chatWithExpert = async (
     // Default: No tool used or just Search used, return text
     return {
       text: firstResponse.text || "I couldn't process that request.",
-      sources: extractSources(firstResponse)
+      sources: searchSources
     };
 
   } catch (error) {
@@ -196,7 +225,8 @@ export const chatWithExpert = async (
 
 export const selfImproveExpert = async (
   expert: Expert, 
-  recentInteraction: string
+  recentInteraction: string,
+  onToolUse?: (data: ToolLogData) => void
 ): Promise<{ newExpertise: string; summary: string; sources: SearchSource[] }> => {
   try {
     const ai = getAiClient();
@@ -235,6 +265,16 @@ export const selfImproveExpert = async (
       }
     }));
 
+    // Log Search if used
+    const searchSources = extractSources(response);
+    if (searchSources.length > 0 && onToolUse) {
+      onToolUse({
+        toolName: 'googleSearch',
+        input: { context: recentInteraction },
+        output: `Verified facts from ${searchSources.length} sources`
+      });
+    }
+
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response from AI");
 
@@ -242,7 +282,7 @@ export const selfImproveExpert = async (
     return {
       newExpertise: result.newExpertise,
       summary: result.summary,
-      sources: extractSources(response)
+      sources: searchSources
     };
 
   } catch (error) {
@@ -399,16 +439,24 @@ export const generateMermaidDiagram = async (
   } catch (error: any) {
     console.error("Diagram Generation Error:", error);
     
-    // Friendly error for Rate Limiting
-    if (error?.status === 429 || error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota')) {
+    // Friendly error for Rate Limiting - Enhanced Check
+    const isRateLimit = 
+      error?.status === 429 || 
+      error?.code === 429 || 
+      error?.error?.code === 429 || 
+      error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.message?.includes('429') || 
+      error?.message?.includes('quota') || 
+      error?.message?.includes('RESOURCE_EXHAUSTED');
+
+    if (isRateLimit) {
        return `graph TD\nError[API Rate Limit Exceeded]\nstyle Error fill:#ffaaaa,stroke:#ff0000,stroke-width:2px`;
     }
 
     return "graph TD\nError[Failed to generate diagram]";
   }
 };
-
-// --- WAR ROOM LOGIC ---
 
 export const getWarRoomTurn = async (
   problem: string,

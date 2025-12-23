@@ -70,12 +70,19 @@ export interface Expert {
   collaborationTopic?: string;
 }
 
+export interface ToolLogData {
+  toolName: string;
+  input: any;
+  output: string;
+}
+
 export interface LogEntry {
   id: string;
   expertId: string;
   expertName: string;
   action: 'Created' | 'Self-Improved' | 'Queried' | 'Error' | 'Collaboration' | 'Reverted' | 'Task Queued' | 'Task Complete' | 'Tool Used';
   details: string;
+  toolData?: ToolLogData;
   timestamp: string;
 }
 
