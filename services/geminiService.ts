@@ -44,12 +44,17 @@ const withRetry = async <T>(operation: () => Promise<T>, retries = 3, delay = 20
   }
 };
 
-// Helper to extract sources from grounding metadata
-const extractSources = (response: any): SearchSource[] => {
-  return response.candidates?.[0]?.groundingMetadata?.groundingChunks
+// Helper to extract sources and queries from grounding metadata
+const extractSearchInfo = (response: any): { sources: SearchSource[], queries: string[] } => {
+  const metadata = response.candidates?.[0]?.groundingMetadata;
+  const sources = metadata?.groundingChunks
     ?.map((c: any) => c.web)
     .filter((w: any) => w)
     .map((w: any) => ({ title: w.title, uri: w.uri })) || [];
+  
+  const queries = metadata?.webSearchQueries || [];
+  
+  return { sources, queries };
 };
 
 export const chatWithExpert = async (
@@ -136,11 +141,11 @@ export const chatWithExpert = async (
     }));
 
     // Log Google Search if used
-    const searchSources = extractSources(firstResponse);
+    const { sources: searchSources, queries: searchQueries } = extractSearchInfo(firstResponse);
     if (searchSources.length > 0 && onToolUse) {
       onToolUse({
         toolName: 'googleSearch',
-        input: { query: 'Implicit grounding query based on context' },
+        input: { queries: searchQueries.length > 0 ? searchQueries : ['Implicit context-based query'] },
         output: `Found ${searchSources.length} sources: ${searchSources.map(s => s.title).join(', ')}`
       });
     }
@@ -199,13 +204,16 @@ export const chatWithExpert = async (
             }
           }));
 
+          // We extract sources from the second response as well, just in case
+          const { sources: secondSources } = extractSearchInfo(secondResponse);
+          
           return {
             text: secondResponse.text || "Collaboration completed but no response text generated.",
             collaboration: {
               withExpertName: targetExpert.name,
               reason: reason
             },
-            sources: extractSources(secondResponse)
+            sources: [...searchSources, ...secondSources]
           };
         }
       }
@@ -266,11 +274,11 @@ export const selfImproveExpert = async (
     }));
 
     // Log Search if used
-    const searchSources = extractSources(response);
+    const { sources: searchSources, queries: searchQueries } = extractSearchInfo(response);
     if (searchSources.length > 0 && onToolUse) {
       onToolUse({
         toolName: 'googleSearch',
-        input: { context: recentInteraction },
+        input: { context: recentInteraction, queries: searchQueries },
         output: `Verified facts from ${searchSources.length} sources`
       });
     }
@@ -293,7 +301,8 @@ export const selfImproveExpert = async (
 
 export const trainExpert = async (
   expert: Expert,
-  trainingData: string
+  trainingData: string,
+  onToolUse?: (data: ToolLogData) => void
 ): Promise<{ newExpertise: string; summary: string }> => {
   try {
     const ai = getAiClient();
@@ -308,17 +317,19 @@ export const trainExpert = async (
       ${expert.expertise}
       \`\`\`
 
-      New Raw Training Data (Code/Text/JSON/SQL):
+      New Raw Training Data (Code/Text/JSON/SQL/Query):
       \`\`\`
       ${trainingData}
       \`\`\`
 
       Task:
-      1. Analyze the raw training data. Extract relevant structural information, rules, schemas, or logic that pertains to this agent's type.
-      2. INTELLIGENTLY MERGE this new knowledge into the existing YAML mental model.
-      3. Do NOT overwrite existing knowledge unless it conflicts. Expand the model.
-      4. Ensure the output is valid YAML.
-      5. Return JSON:
+      1. Analyze the raw training data.
+      2. Use Google Search to verify the accuracy of the data or expand upon concepts if the input is sparse (e.g., just a topic name).
+      3. Extract relevant structural information, rules, schemas, or logic.
+      4. INTELLIGENTLY MERGE this new knowledge into the existing YAML mental model.
+      5. Do NOT overwrite existing knowledge unless it conflicts. Expand the model.
+      6. Ensure the output is valid YAML.
+      7. Return JSON:
          - "newExpertise": The full merged YAML string.
          - "summary": A very brief summary of what was ingested (e.g. "Ingested User schema" or "Added Auth API endpoints").
     `;
@@ -327,9 +338,20 @@ export const trainExpert = async (
       model,
       contents: prompt,
       config: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }] // Enable search for training/ingestion
       }
     }));
+
+    // Log Search if used
+    const { sources: searchSources, queries: searchQueries } = extractSearchInfo(response);
+    if (searchSources.length > 0 && onToolUse) {
+      onToolUse({
+        toolName: 'googleSearch',
+        input: { trainingDataPreview: trainingData.substring(0, 50), queries: searchQueries },
+        output: `Enhanced training data with ${searchSources.length} external sources`
+      });
+    }
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response from AI");

@@ -949,7 +949,7 @@ const App: React.FC = () => {
 
           case 'TRAIN': {
             const { data } = nextTask.payload;
-            const result = await trainExpertService(expert, data);
+            const result = await trainExpertService(expert, data, handleToolLog);
             
              setExperts(prev => prev.map(e => {
               if (e.id === expert.id) {
