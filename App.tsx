@@ -33,113 +33,184 @@ import { chatWithExpert, selfImproveExpert, trainExpert as trainExpertService } 
 const INITIAL_EXPERTS: Expert[] = [
   {
     id: '1',
-    name: 'Database Expert',
+    name: 'Database Architect',
     type: ExpertType.DATABASE,
-    description: 'Knows your database schema, relationships, and query patterns. Maintains a mental model of data flow.',
+    description: 'Maintains the source of truth for data schemas, indexing strategies, and query performance optimization.',
     status: ExpertStatus.ACTIVE,
-    learnings: 3,
+    learnings: 12,
     lastUpdated: new Date().toISOString(),
-    version: 1,
+    version: 3,
     history: [],
-    expertise: `schema:
+    expertise: `architecture:
+  engine: PostgreSQL 16
+  clustering: Primary-Replica (3 nodes)
+  connection_pooling: PgBouncer
+schema:
   users:
-    id: uuid
-    email: string
-    created_at: timestamp
-  posts:
-    id: uuid
-    user_id: uuid (fk)
-    content: text
-relationships:
-  - users.id -> posts.user_id
-patterns:
-  - High read volume on posts
-  - Frequent user updates`
+    columns:
+      id: uuid (pk)
+      email: varchar(255) (unique, index)
+      role: enum(admin, user, auditor)
+      settings: jsonb (default: {})
+      created_at: timestamp
+    indexes:
+      - idx_users_email_gin (trigram)
+      - idx_users_created_at
+  transactions:
+    columns:
+      id: uuid (pk)
+      user_id: uuid (fk -> users.id)
+      amount: decimal(12, 2)
+      currency: varchar(3)
+      status: enum(pending, settled, failed)
+    partitioning:
+      strategy: TIME (monthly)
+performance_rules:
+  - rule: "No SELECT * in production"
+  - rule: "Foreign keys must be indexed"
+  - rule: "JSONB queries must use GIN indexes"
+maintenance:
+  vacuum_strategy: autovacuum_aggressive
+  backup: WAL-G (Continuous Archiving)`
   },
   {
     id: '2',
-    name: 'API Expert',
+    name: 'API Gateway Lead',
     type: ExpertType.API,
-    description: 'Understands your API endpoints, request/response patterns, and integration points.',
+    description: 'Governs the interface contract, authentication flows, rate limiting, and request validation standards.',
     status: ExpertStatus.ACTIVE,
+    learnings: 8,
+    lastUpdated: new Date().toISOString(),
+    version: 2,
+    history: [],
+    expertise: `standards:
+  protocol: REST + GraphQL
+  versioning: URI Path (v1, v2)
+  documentation: OpenAPI 3.1
+security:
+  authentication:
+    mechanism: OAuth2 / OpenID Connect
+    provider: Auth0 / Cognito
+    token_type: Bearer JWT
+  rate_limiting:
+    algorithm: Token Bucket
+    default_policy: 100 req/min per IP
+    authenticated_policy: 1000 req/min per User
+endpoints:
+  v1/analytics:
+    method: POST
+    validation: Zod Strict Schema
+    retry_policy: None (Fire-and-forget)
+  v1/payments:
+    method: POST
+    idempotency: Required (Idempotency-Key header)
+error_handling:
+  format: RFC 7807 (Problem Details)
+  codes:
+    400: Validation Failure
+    401: Invalid Token
+    429: Rate Limit Exceeded`
+  },
+  {
+    id: '5',
+    name: 'Backend Core',
+    type: ExpertType.BACKEND,
+    description: 'Orchestrates microservices, background workers, and core business logic execution.',
+    status: ExpertStatus.ACTIVE,
+    learnings: 15,
+    lastUpdated: new Date().toISOString(),
+    version: 4,
+    history: [],
+    expertise: `infrastructure:
+  orchestrator: Kubernetes (EKS)
+  iac: Terraform
+  cicd: GitHub Actions -> ArgoCD
+services:
+  core_api:
+    lang: Node.js (NestJS)
+    scaling: HPA (CPU > 70%)
+  billing_worker:
+    lang: Go
+    pattern: Event-Driven Consumer
+    queue: SQS FIFO
+patterns:
+  resiliency:
+    circuit_breaker:
+      threshold: 50% failure
+      reset_timeout: 30s
+    retry: Exponential Backoff (max 3 attempts)
+  caching:
+    layer_1: Redis (Shared) - TTL 1h
+    layer_2: In-Memory (LRU) - TTL 5m
+observability:
+  metrics: Prometheus
+  tracing: OpenTelemetry
+  logging: ELK Stack`
+  },
+  {
+    id: '3',
+    name: 'Realtime Controller',
+    type: ExpertType.WEBSOCKET,
+    description: 'Manages persistent connections, event broadcasting, and presence systems.',
+    status: ExpertStatus.IDLE,
     learnings: 5,
     lastUpdated: new Date().toISOString(),
     version: 2,
     history: [],
-    expertise: `endpoints:
-  GET /api/v1/users:
-    auth: required
-    rate_limit: 100/min
-  POST /api/v1/data:
-    validation: strict schema
-auth_flow:
-  type: Bearer JWT
-  expiration: 1h`
-  },
-  {
-    id: '5',
-    name: 'Backend Expert',
-    type: ExpertType.BACKEND,
-    description: 'Manages server-side logic, background jobs, and microservices architecture.',
-    status: ExpertStatus.ACTIVE,
-    learnings: 1,
-    lastUpdated: new Date().toISOString(),
-    version: 1,
-    history: [],
-    expertise: `services:
-  auth_service:
-    port: 3001
-    db: redis
-    replicas: 2
-  payment_service:
-    provider: stripe
-    webhook: /webhooks/stripe
-workers:
-  - email_processor
-  - data_aggregator
-infrastructure:
-  cloud: aws
-  region: us-east-1
-  orchestrator: kubernetes
-  registry: ecr`
-  },
-  {
-    id: '3',
-    name: 'WebSocket Expert',
-    type: ExpertType.WEBSOCKET,
-    description: 'Tracks all WebSocket events, communication patterns, and real-time data flows in your application.',
-    status: ExpertStatus.IDLE,
-    learnings: 2,
-    lastUpdated: new Date().toISOString(),
-    version: 1,
-    history: [],
-    expertise: `events:
-  user.connect:
-    payload: { userId, timestamp }
-  chat.message:
-    payload: { roomId, text }
-channels:
-  - global
-  - room:{id}`
+    expertise: `protocol:
+  transport: Secure WebSocket (WSS)
+  fallback: Long Polling
+  handshake: HTTP Upgrade + JWT Query Param
+state_management:
+  adapter: Redis Pub/Sub (Sharded)
+  sticky_sessions: Enabled (Nginx Hash)
+events:
+  namespaces:
+    /chat:
+      - join_room { roomId }
+      - send_message { text, type }
+      - typing { isTyping }
+    /notifications:
+      - system_alert { level, msg }
+      - task_update { taskId, status }
+scalability:
+  max_connections_per_node: 10,000
+  heartbeat_interval: 25s
+  connection_timeout: 60s
+  backpressure: Drop oldest messages if queue > 100`
   },
   {
     id: '4',
-    name: 'Frontend Expert',
+    name: 'Frontend Architect',
     type: ExpertType.FRONTEND,
-    description: 'Maintains knowledge of component structure, state management, and UI patterns.',
+    description: 'Defines component systems, state management patterns, and performance budgets for the client.',
     status: ExpertStatus.IDLE,
-    learnings: 8,
+    learnings: 20,
     lastUpdated: new Date().toISOString(),
-    version: 4,
+    version: 5,
     history: [],
-    expertise: `components:
-  Button:
-    variants: [primary, secondary, ghost]
-  Modal:
-    state: isOpen (boolean)
+    expertise: `stack:
+  framework: React 19
+  build: Vite
+  styling: TailwindCSS
+  language: TypeScript 5.x
+architecture:
+  pattern: Feature-Sliced Design
+  routing: File-system based
 state_management:
-  tool: Redux Toolkit
-  stores: [auth, ui, data]`
+  server_state: TanStack Query (staleTime: 5m)
+  global_ui: Zustand
+  form_state: React Hook Form + Zod
+performance_budget:
+  LCP: < 2.5s
+  CLS: < 0.1
+  FID: < 100ms
+  bundle_size:
+    initial: < 200KB (gzipped)
+component_library:
+  atomic_design: true
+  accessibility: WCAG 2.1 AA Compliant
+  testing: Vitest + Testing Library`
   }
 ];
 

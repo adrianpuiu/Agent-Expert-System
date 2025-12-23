@@ -24,6 +24,7 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
   };
 
   const isCollaborating = expert.status === ExpertStatus.COLLABORATING;
+  const partnerName = expert.collaboratingWith ? expert.collaboratingWith.split(' ')[0] : 'Peer';
 
   return (
     <div className={`
@@ -56,8 +57,10 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
             </div>
           </div>
           
-          <span className={`
-            px-2.5 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5
+          <span 
+            title={isCollaborating ? `Collaborating with ${expert.collaboratingWith}` : expert.status}
+            className={`
+            px-2.5 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 cursor-help
             ${expert.status === ExpertStatus.ACTIVE ? 'bg-orange-50 text-orange-700 border-orange-100' :
               expert.status === ExpertStatus.LEARNING ? 'bg-purple-100 text-purple-700 border-purple-200 animate-pulse' :
               expert.status === ExpertStatus.THINKING ? 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' :
@@ -66,7 +69,7 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
           `}>
              {isCollaborating && <Network className="w-3.5 h-3.5" />}
              {isCollaborating 
-              ? <span className="font-semibold">Linked: {expert.collaboratingWith?.split(' ')[0]}</span>
+              ? <span className="font-semibold flex items-center gap-1">Linked <span className="opacity-50 text-[10px] mx-0.5">↔</span> {partnerName}</span>
               : <span className="capitalize">{expert.status}</span>}
           </span>
         </div>
