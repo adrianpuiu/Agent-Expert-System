@@ -1,6 +1,6 @@
 import React from 'react';
 import { Expert, ExpertStatus, ExpertType } from '../types';
-import { Database, Server, Wifi, Layout, Brain, Activity, Eye, Zap, MessageSquare, Upload, Users, Cpu, Network } from 'lucide-react';
+import { Database, Server, Wifi, Layout, Brain, Activity, Eye, Zap, MessageSquare, Upload, Users, Cpu, Network, Cloud, ShieldCheck } from 'lucide-react';
 
 interface ExpertCardProps {
   expert: Expert;
@@ -19,6 +19,8 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
       case ExpertType.BACKEND: return <Cpu className="w-6 h-6" />;
       case ExpertType.WEBSOCKET: return <Wifi className="w-6 h-6" />;
       case ExpertType.FRONTEND: return <Layout className="w-6 h-6" />;
+      case ExpertType.DEVOPS: return <Cloud className="w-6 h-6" />;
+      case ExpertType.SECURITY: return <ShieldCheck className="w-6 h-6" />;
       default: return <Brain className="w-6 h-6" />;
     }
   };

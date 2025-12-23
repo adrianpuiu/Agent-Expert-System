@@ -5,6 +5,8 @@ export enum ExpertType {
   WEBSOCKET = 'WebSocket',
   FRONTEND = 'Frontend',
   BACKEND = 'Backend',
+  DEVOPS = 'DevOps',
+  SECURITY = 'Security',
   META = 'Meta'
 }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Bot, Loader2, Save, ArrowRight, ArrowLeft, Database, Server, Wifi, Layout, Brain, CheckCircle2, Cpu } from 'lucide-react';
+import { X, Sparkles, Bot, Loader2, Save, ArrowRight, ArrowLeft, Database, Server, Wifi, Layout, Brain, CheckCircle2, Cpu, Cloud, ShieldCheck } from 'lucide-react';
 import { ExpertType } from '../types';
 import { generateMetaContent } from '../services/geminiService';
 
@@ -75,6 +75,8 @@ Ensure the structure reflects domain-specific knowledge (e.g., schemas for Datab
       case ExpertType.BACKEND: return <Cpu className="w-5 h-5" />;
       case ExpertType.WEBSOCKET: return <Wifi className="w-5 h-5" />;
       case ExpertType.FRONTEND: return <Layout className="w-5 h-5" />;
+      case ExpertType.DEVOPS: return <Cloud className="w-5 h-5" />;
+      case ExpertType.SECURITY: return <ShieldCheck className="w-5 h-5" />;
       case ExpertType.META: return <Brain className="w-5 h-5" />;
       default: return <Bot className="w-5 h-5" />;
     }
@@ -146,7 +148,7 @@ Ensure the structure reflects domain-specific knowledge (e.g., schemas for Datab
 
               <div className="space-y-3">
                 <label className="text-sm font-semibold text-gray-700">Select expert type</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {Object.values(ExpertType).map((t) => (
                     <button
                       key={t}
@@ -160,7 +162,7 @@ Ensure the structure reflects domain-specific knowledge (e.g., schemas for Datab
                       `}
                     >
                       {getTypeIcon(t)}
-                      <span className="text-sm font-medium">{t}</span>
+                      <span className="text-xs font-medium truncate w-full text-center">{t}</span>
                     </button>
                   ))}
                 </div>

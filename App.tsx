@@ -331,6 +331,100 @@ testing_strategy:
   unit: Vitest (Logic & Utils)
   component: React Testing Library
   e2e: Playwright (Critical user journeys)`
+  },
+  {
+    id: '6',
+    name: 'Cloud Infrastructure Lead',
+    type: ExpertType.DEVOPS,
+    description: 'Manages the deployment pipelines, container orchestration, and cloud resource provisioning.',
+    status: ExpertStatus.ACTIVE,
+    learnings: 7,
+    lastUpdated: new Date().toISOString(),
+    version: 3,
+    history: [],
+    expertise: `cloud_provider: AWS (Primary), GCP (Data Backup)
+
+infrastructure_as_code:
+  tool: Terraform
+  modules:
+    - networking (VPC, Subnets, NAT)
+    - eks_cluster (Control plane, Node groups)
+    - databases (RDS, ElastiCache)
+  state_management: S3 + DynamoDB Lock (Remote)
+
+container_orchestration:
+  platform: Kubernetes (EKS 1.29)
+  ingress:
+    controller: Nginx Ingress Controller
+    cert_manager: Let's Encrypt (DNS-01 challenge)
+  service_mesh: Istio (mTLS strict mode)
+
+ci_cd_pipelines:
+  platform: GitHub Actions
+  workflow:
+    1_lint_test: ESLint + Vitest
+    2_build_push: Docker Build -> ECR
+    3_deploy_staging: Helm Upgrade -> Staging Namespace
+    4_integration_test: Run Playwright
+    5_deploy_prod: Manual Approval -> Helm Upgrade -> Prod
+
+observability_stack:
+  metrics: Prometheus Operator + Grafana
+  logging: Fluentbit -> OpenSearch
+  tracing: Jaeger (Sampling rate 10%)
+
+cost_optimization:
+  spot_instances: Enabled for stateless node groups (max 70%)
+  auto_scaling: Karpenter (Just-in-time provisioning)`
+  },
+  {
+    id: '7',
+    name: 'Security Sentinel',
+    type: ExpertType.SECURITY,
+    description: 'Enforces security policies, conducts vulnerability assessments, and manages identity governance.',
+    status: ExpertStatus.IDLE,
+    learnings: 4,
+    lastUpdated: new Date().toISOString(),
+    version: 1,
+    history: [],
+    expertise: `app_sec:
+  sast: SonarQube (Quality Gate enforced on PR)
+  dast: OWASP ZAP (Running on Staging nightly)
+  dependency_scanning: Snyk (Block build on High severity)
+
+network_security:
+  waf: AWS WAF (Managed Rules: Common, SQLi, IP Reputation)
+  ddos_protection: AWS Shield Advanced
+  zero_trust:
+    internal_access: Teleport (Short-lived SSH/K8s certs)
+    vpn: Deprecated in favor of Identity-Aware Proxy
+
+identity_management:
+  customer_iam:
+    mfa: Enforced (TOTP / WebAuthn)
+    password_policy: NIST 800-63B compliant
+    session_management:
+      idle_timeout: 15m
+      absolute_timeout: 12h
+  
+  cloud_iam:
+    principle: Least Privilege
+    access_reviews: Quarterly
+
+compliance:
+  frameworks: SOC2 Type II, GDPR, HIPAA
+  data_privacy:
+    encryption_at_rest: AES-256 (KMS)
+    encryption_in_transit: TLS 1.3 only
+    pii_masking: Enabled in logs
+
+incident_response:
+  severity_levels:
+    sev1: Data Breach / Full Outage (Page Execs)
+    sev2: Feature Broken / Perf Degraded
+  playbooks:
+    - ransomware_containment
+    - leaked_credential_rotation`
   }
 ];
 
@@ -604,6 +698,8 @@ const App: React.FC = () => {
       [ExpertType.BACKEND]: "Worker queue latency increased during batch processing.",
       [ExpertType.WEBSOCKET]: "Detected connection drops on channel 'global' during peak load.",
       [ExpertType.FRONTEND]: "Button component deprecated 'ghost' variant in favor of 'text'.",
+      [ExpertType.DEVOPS]: "Kubernetes pod autoscaler flapping detected.",
+      [ExpertType.SECURITY]: "New CVE discovered in OpenSSL dependency.",
       [ExpertType.META]: "Meta agent structure optimized."
     };
     
@@ -611,15 +707,6 @@ const App: React.FC = () => {
 
     // Low Priority for background learning
     addTask('IMPROVE', TaskPriority.LOW, expert.id, `Self-improvement cycle: ${expert.name}`, { context });
-  };
-
-  // Replaces direct execution with QUEUEING
-  const handleTrainComplete = (expertId: string, newExpertise: string, summary: string) => {
-     // Note: TrainExpertModal calls trainExpert service directly for preview, but we can queue the *application* of it if we wanted.
-     // However, the prompt asked to queue the tasks. 
-     // For this flow, `TrainExpertModal` executes the generation. We just update state here.
-     // To make it fully queued, we'd move the generation logic here.
-     // Let's refactor `TrainExpertModal` to just pass the data, and we queue the execution.
   };
 
   const handleQueueTraining = (expertId: string, trainingData: string) => {
