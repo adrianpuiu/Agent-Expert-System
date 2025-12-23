@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
-import { Expert, ChatMessage } from '../types';
+import { X, Send, Bot, User, Loader2, Sparkles, Users } from 'lucide-react';
+import { Expert, ChatMessage, ExpertStatus } from '../types';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -33,7 +33,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, expert, onSendMe
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-100 rounded-lg">
               <Bot className="w-5 h-5 text-orange-600" />
@@ -47,6 +47,19 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, expert, onSendMe
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+
+        {/* Real-time Collaboration Status Banner */}
+        {expert.status === ExpertStatus.COLLABORATING && (
+          <div className="bg-indigo-50 border-b border-indigo-100 p-2.5 flex items-center justify-center gap-3 text-xs font-medium text-indigo-700 animate-in slide-in-from-top-2 duration-300">
+             <div className="relative">
+               <Users className="w-4 h-4 text-indigo-600" />
+               <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full animate-ping" />
+             </div>
+             <span>
+               <span className="font-bold">{expert.name}</span> is now collaborating with <span className="font-bold">{expert.collaboratingWith}</span>
+             </span>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/50 custom-scrollbar">

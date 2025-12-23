@@ -21,7 +21,8 @@ export const chatWithExpert = async (
   expert: Expert, 
   userMessage: string, 
   history: { role: string; text: string }[],
-  availableExperts: Expert[]
+  availableExperts: Expert[],
+  onCollaborationStart?: (partnerName: string, reason: string) => void
 ): Promise<ChatResponse> => {
   try {
     const ai = getAiClient();
@@ -102,6 +103,11 @@ export const chatWithExpert = async (
       if (call.name === 'consult_expert') {
         const { expertName, reason } = call.args as { expertName: string; reason: string };
         
+        // Trigger real-time callback
+        if (onCollaborationStart) {
+          onCollaborationStart(expertName, reason);
+        }
+
         // Find the target expert
         const targetExpert = otherExperts.find(e => 
           e.name.toLowerCase().includes(expertName.toLowerCase()) || 

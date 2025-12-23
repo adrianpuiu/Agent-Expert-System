@@ -85,11 +85,18 @@ auth_flow:
   auth_service:
     port: 3001
     db: redis
+    replicas: 2
   payment_service:
     provider: stripe
+    webhook: /webhooks/stripe
 workers:
   - email_processor
-  - data_aggregator`
+  - data_aggregator
+infrastructure:
+  cloud: aws
+  region: us-east-1
+  orchestrator: kubernetes
+  registry: ecr`
   },
   {
     id: '3',
@@ -212,7 +219,7 @@ const App: React.FC = () => {
       // 2. Mark as Processing
       setTasks(prev => prev.map(t => t.id === nextTask.id ? { ...t, status: TaskStatus.PROCESSING } : t));
       
-      // Update Expert Status
+      // Update Expert Status (Primary Expert)
       setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.THINKING } : e));
 
       try {
@@ -223,7 +230,29 @@ const App: React.FC = () => {
         switch (nextTask.type) {
           case 'CHAT': {
             const { message, history } = nextTask.payload;
-            const response = await chatWithExpert(expert, message, history, experts);
+            
+            // Callback for real-time collaboration status update
+            const handleCollaborationStart = (partnerName: string, reason: string) => {
+               setExperts(prevExperts => prevExperts.map(e => {
+                  if (e.id === expert.id) {
+                     return { ...e, status: ExpertStatus.COLLABORATING, collaboratingWith: partnerName };
+                  }
+                  if (e.name.toLowerCase() === partnerName.toLowerCase()) {
+                     return { ...e, status: ExpertStatus.COLLABORATING, collaboratingWith: expert.name };
+                  }
+                  return e;
+               }));
+            };
+
+            const response = await chatWithExpert(expert, message, history, experts, handleCollaborationStart);
+            
+            // Cleanup collaboration status after chat
+            setExperts(prevExperts => prevExperts.map(e => {
+               if (e.id === expert.id || e.status === ExpertStatus.COLLABORATING) {
+                  return { ...e, status: ExpertStatus.ACTIVE, collaboratingWith: undefined };
+               }
+               return e;
+            }));
             
             // Handle Chat UI updates via callback or state if modal is open
             if (chattingExpert && chattingExpert.id === expert.id) {
@@ -299,12 +328,14 @@ const App: React.FC = () => {
 
         // 4. Cleanup
         setTasks(prev => prev.filter(t => t.id !== nextTask.id)); // Remove completed
-        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.ACTIVE } : e));
+        
+        // Final sanity check cleanup for the task owner status (in case of error or non-chat tasks)
+        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.ACTIVE, collaboratingWith: undefined } : e));
 
       } catch (error) {
         console.error("Task Failed", error);
         setTasks(prev => prev.map(t => t.id === nextTask.id ? { ...t, status: TaskStatus.FAILED } : t));
-        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.IDLE } : e));
+        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.IDLE, collaboratingWith: undefined } : e));
         addLog(nextTask.expertId, 'System', 'Error', `Task failed: ${nextTask.description}`);
       } finally {
         setIsQueueProcessing(false);
@@ -725,7 +756,7 @@ const App: React.FC = () => {
         <ChatModal
           isOpen={!!chattingExpert}
           onClose={() => setChattingExpert(null)}
-          expert={chattingExpert}
+          expert={experts.find(e => e.id === chattingExpert.id) || chattingExpert}
           onSendMessage={handleSendMessage}
           messages={chatMessages}
           isProcessing={isQueueProcessing && tasks.some(t => t.expertId === chattingExpert.id && t.priority === TaskPriority.CRITICAL)}

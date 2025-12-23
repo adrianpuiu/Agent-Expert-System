@@ -12,7 +12,8 @@ export enum ExpertStatus {
   ACTIVE = 'active',
   LEARNING = 'learning',
   THINKING = 'thinking',
-  QUEUED = 'queued'
+  QUEUED = 'queued',
+  COLLABORATING = 'collaborating'
 }
 
 export enum TaskPriority {
@@ -58,6 +59,7 @@ export interface Expert {
   expertise: string; // YAML string representing the mental model
   version: number;
   history: ExpertiseHistory[];
+  collaboratingWith?: string;
 }
 
 export interface LogEntry {

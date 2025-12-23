@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Bot, Loader2, Save, ArrowRight, ArrowLeft, Database, Server, Wifi, Layout, Brain, CheckCircle2 } from 'lucide-react';
+import { X, Sparkles, Bot, Loader2, Save, ArrowRight, ArrowLeft, Database, Server, Wifi, Layout, Brain, CheckCircle2, Cpu } from 'lucide-react';
 import { ExpertType } from '../types';
 import { generateMetaContent } from '../services/geminiService';
 
@@ -72,6 +72,7 @@ Ensure the structure reflects domain-specific knowledge (e.g., schemas for Datab
     switch (t) {
       case ExpertType.DATABASE: return <Database className="w-5 h-5" />;
       case ExpertType.API: return <Server className="w-5 h-5" />;
+      case ExpertType.BACKEND: return <Cpu className="w-5 h-5" />;
       case ExpertType.WEBSOCKET: return <Wifi className="w-5 h-5" />;
       case ExpertType.FRONTEND: return <Layout className="w-5 h-5" />;
       case ExpertType.META: return <Brain className="w-5 h-5" />;
