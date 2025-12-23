@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Swords, PauseCircle, PlayCircle, CheckCircle2, ShieldAlert, Cpu, Bot, User, Brain, AlertTriangle, Power, Mic, MicOff, Users } from 'lucide-react';
+import { X, Swords, PauseCircle, PlayCircle, CheckCircle2, ShieldAlert, Cpu, Bot, User, Brain, AlertTriangle, Power, Mic, MicOff, Users, Globe, ExternalLink } from 'lucide-react';
 import { Expert, WarRoomMessage } from '../types';
 import { getWarRoomTurn } from '../services/geminiService';
 
@@ -82,7 +82,8 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
           role: turn.speakerId === 'moderator' ? 'moderator' : 'expert',
           content: turn.content,
           timestamp: Date.now(),
-          isConsensus: turn.isConsensus
+          isConsensus: turn.isConsensus,
+          sources: turn.sources // Capture sources from API
         };
 
         setMessages(prev => [...prev, newMessage]);
@@ -93,28 +94,8 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
           setIsDebating(false);
         } else {
           // Schedule next turn
-          // Note: If activeExpertIds changes during this timeout, the effect cleans up, clears timeout, 
-          // and re-runs runTurn immediately with the NEW list of experts. This provides responsive control.
           timeout = setTimeout(() => {
-             // We rely on state updates to trigger the next loop via dependency array if needed,
-             // but strictly speaking, the dependency array handles the re-entry.
-             // However, to ensure the loop continues without a state change trigger (like activeExpertIds changing),
-             // we need to trigger a state change or call a function. 
-             // Since runTurn is inside the effect, we can't call it directly from here easily without recursion issues.
-             // Hack: We flip a dummy state or rely on the fact that we just updated 'messages' and 'turnCount'.
-             // Wait... 'messages' and 'turnCount' ARE dependencies. 
-             // So when setMessages happens above, this effect triggers again!
-             // So we actually DON'T need a timeout to call runTurn, we need a timeout to DELAY the state update?
-             // No, the state update happens after await.
-             // Correct flow: Fetch -> SetState -> Effect Re-runs -> Logic checks -> Fetch.
-             // To add a delay between turns, we should `await` a delay inside `runTurn` BEFORE fetching? 
-             // Or better: The `setMessages` triggers the re-run. We want that re-run to wait.
-             
-             // Current logic: The `useEffect` runs on `messages` update.
-             // Immediate fetch is annoying.
-             // Let's rely on the timeout to set a "ready for next turn" state? 
-             // Simpler: Just put a delay at the START of runTurn if it's not the first turn?
-             // Or put delay here:
+             // Logic handled by dependency change on messages/turnCount re-triggering effect
           }, 2500); 
         }
 
@@ -126,19 +107,8 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
       }
     };
 
-    // If activeExpertIds changes, we want to respect that immediately for the NEXT turn.
-    // If we are currently waiting (debounce/delay), we want to cancel that wait and maybe restart logic?
-    // Actually, if we just updated messages, the effect runs.
-    
-    // We add a small delay mechanism to prevent rapid-fire API calls if the effect re-runs purely due to state changes
-    // that aren't "ready for next turn". 
-    // Ideally, `runTurn` executes, updates state, effect triggers.
-    // We want a pause between turns.
-    
     if (isDebating) {
-       // Check if we just finished a turn (based on timestamp of last message vs now?)
-       // Or simply: Always delay slightly before executing to allow UI to breathe, 
-       // UNLESS it's the very first turn.
+       // Pause slightly before executing to allow UI to breathe
        const delay = messages.length === 0 ? 0 : 2500;
        timeout = setTimeout(runTurn, delay);
     }
@@ -322,6 +292,28 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
                     `}>
                        {msg.isConsensus && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Consensus Reached</div>}
                        {msg.content}
+                       
+                       {/* Sources Display for War Room */}
+                       {msg.sources && msg.sources.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-700/50 flex flex-wrap gap-2">
+                            <div className="w-full text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                              <Globe className="w-3 h-3" /> Grounded in Reality
+                            </div>
+                            {msg.sources.map((source, i) => (
+                              <a 
+                                key={i} 
+                                href={source.uri} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-[10px] text-gray-400 hover:text-white transition-colors max-w-full truncate"
+                                title={source.title}
+                              >
+                                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                 <span className="truncate max-w-[150px]">{source.title || 'Web Source'}</span>
+                              </a>
+                            ))}
+                          </div>
+                       )}
                     </div>
                   </div>
                 ))}

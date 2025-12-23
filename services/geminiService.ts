@@ -116,10 +116,11 @@ export const chatWithExpert = async (
 
       Rules:
       1. Answer questions primarily using your own mental model.
-      2. ACTIVE SEARCH: If the user asks for current events, specific documentation, library versions, or facts you are not 100% sure about, you MUST use Google Search to verify.
-      3. GROUNDING: When you use search, incorporate the findings naturally into your response.
-      4. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool.
-      5. Be concise and professional.
+      2. ACTIVE SEARCH: If the user asks for current events, specific library documentation, framework updates, or facts you are not 100% sure about, you MUST use Google Search to verify.
+      3. CITATION: If you use search, include the library name and version number if found.
+      4. GROUNDING: When you use search, incorporate the findings naturally into your response.
+      5. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool.
+      6. Be concise and professional.
     `;
 
     // Flatten history for context
@@ -492,7 +493,7 @@ export const getWarRoomTurn = async (
   problem: string,
   history: WarRoomMessage[],
   experts: Expert[]
-): Promise<{ speakerId: string; speakerName: string; content: string; isConsensus: boolean }> => {
+): Promise<{ speakerId: string; speakerName: string; content: string; isConsensus: boolean; sources?: SearchSource[] }> => {
   try {
     const ai = getAiClient();
     const model = 'gemini-3-flash-preview';
@@ -521,10 +522,11 @@ export const getWarRoomTurn = async (
       Rules:
       1. Decide who should speak next based on the transcript.
       2. If a specific expert needs to provide technical details, simulate that expert (speak AS them).
-      3. If the experts have debated enough and a solution is clear, YOU (Moderator) speak to summarize the consensus.
-      4. Keep turns concise (under 50 words unless providing code/schema).
-      5. Encourage conflict/correction if an expert is wrong.
-      6. Do NOT repeat the same speaker twice in a row unless they are clarifying.
+      3. CRITICAL: If a technical fact, library version, or recent update is mentioned, USE GOOGLE SEARCH to verify it before speaking.
+      4. If the experts have debated enough and a solution is clear, YOU (Moderator) speak to summarize the consensus.
+      5. Keep turns concise (under 50 words unless providing code/schema).
+      6. Encourge conflict/correction if an expert is wrong.
+      7. Do NOT repeat the same speaker twice in a row unless they are clarifying.
     `;
 
     const prompt = `
@@ -547,14 +549,19 @@ export const getWarRoomTurn = async (
       contents: prompt,
       config: {
         systemInstruction,
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }] // Enable search in War Room for grounding
       }
     }));
+
+    // Extract search info if used during the turn generation
+    const { sources } = extractSearchInfo(response);
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response");
     
-    return JSON.parse(jsonText);
+    const parsed = JSON.parse(jsonText);
+    return { ...parsed, sources };
 
   } catch (error) {
     console.error("War Room Error:", error);

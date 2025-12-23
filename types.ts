@@ -109,4 +109,5 @@ export interface WarRoomMessage {
   content: string;
   timestamp: number;
   isConsensus?: boolean;
+  sources?: SearchSource[];
 }
