@@ -41,37 +41,65 @@ const INITIAL_EXPERTS: Expert[] = [
     lastUpdated: new Date().toISOString(),
     version: 3,
     history: [],
-    expertise: `architecture:
-  engine: PostgreSQL 16
-  clustering: Primary-Replica (3 nodes)
-  connection_pooling: PgBouncer
-schema:
+    expertise: `domain_principles:
+  acid_compliance: strict
+  normalization_level: 3NF (default)
+  scaling_strategy: "Vertical first, then Horizontal (Sharding)"
+
+architecture:
+  primary_engine: PostgreSQL 16
+  topology:
+    nodes: 3 (1 Primary, 2 Replicas)
+    replication: Streaming (Async)
+  connection_pooling:
+    software: PgBouncer
+    mode: transaction
+    max_connections: 5000
+
+schema_registry:
   users:
+    description: "Core identity and profile data"
     columns:
-      id: uuid (pk)
-      email: varchar(255) (unique, index)
-      role: enum(admin, user, auditor)
-      settings: jsonb (default: {})
-      created_at: timestamp
+      id: uuid (pk, v4)
+      email: varchar(255) (unique, not_null)
+      password_hash: varchar(255) (argon2id)
+      role: enum('admin', 'user', 'auditor')
+      metadata: jsonb (default: '{}')
+      created_at: timestamp (default: now())
     indexes:
-      - idx_users_email_gin (trigram)
-      - idx_users_created_at
-  transactions:
+      - name: idx_users_email_gin
+        type: GIN (trigram)
+        purpose: "Fuzzy search on emails"
+      - name: idx_users_created_at
+        type: BTREE
+        purpose: "Range queries for analytics"
+
+  orders:
+    description: "Transactional records of purchases"
     columns:
-      id: uuid (pk)
+      id: bigint (pk, identity)
       user_id: uuid (fk -> users.id)
-      amount: decimal(12, 2)
-      currency: varchar(3)
-      status: enum(pending, settled, failed)
+      status: enum('pending', 'paid', 'shipped', 'cancelled')
+      total_cents: integer
+      currency: char(3)
     partitioning:
-      strategy: TIME (monthly)
-performance_rules:
-  - rule: "No SELECT * in production"
-  - rule: "Foreign keys must be indexed"
-  - rule: "JSONB queries must use GIN indexes"
-maintenance:
-  vacuum_strategy: autovacuum_aggressive
-  backup: WAL-G (Continuous Archiving)`
+      strategy: RANGE (created_at)
+      interval: "1 month"
+
+operational_policies:
+  performance_tuning:
+    - rule: "No SELECT * in production applications"
+    - rule: "All Foreign Keys must have a supporting index"
+    - rule: "Queries taking > 100ms must be logged and analyzed"
+  
+  maintenance:
+    autovacuum: aggressive
+    stats_collection: daily
+  
+  disaster_recovery:
+    rpo: "5 minutes"
+    rto: "1 hour"
+    strategy: WAL-G Continuous Archiving to S3`
   },
   {
     id: '2',
@@ -83,33 +111,56 @@ maintenance:
     lastUpdated: new Date().toISOString(),
     version: 2,
     history: [],
-    expertise: `standards:
-  protocol: REST + GraphQL
-  versioning: URI Path (v1, v2)
-  documentation: OpenAPI 3.1
-security:
+    expertise: `governance:
+  protocols:
+    - REST (Public facing)
+    - GraphQL (Frontend flexibility)
+    - gRPC (Internal microservices)
+  versioning_strategy: URI Path (e.g., /v1/resource)
+  documentation_standard: OpenAPI 3.1
+
+security_layer:
   authentication:
     mechanism: OAuth2 / OpenID Connect
     provider: Auth0 / Cognito
-    token_type: Bearer JWT
-  rate_limiting:
-    algorithm: Token Bucket
-    default_policy: 100 req/min per IP
-    authenticated_policy: 1000 req/min per User
-endpoints:
-  v1/analytics:
+    token_format: JWT (RS256 signature)
+  authorization:
+    model: RBAC (Role-Based Access Control)
+    scopes:
+      - read:profile
+      - write:orders
+  
+  threat_protection:
+    rate_limiting:
+      algorithm: Sliding Window Log
+      public_limit: 60 req/min per IP
+      authenticated_limit: 1000 req/min per User
+    cors:
+      allowed_origins: ["*.myapp.com"]
+      allowed_methods: ["GET", "POST", "PUT", "DELETE"]
+
+endpoint_catalog:
+  analytics:
+    path: /v1/analytics/events
     method: POST
     validation: Zod Strict Schema
-    retry_policy: None (Fire-and-forget)
-  v1/payments:
+    behavior: Fire-and-forget (Async processing)
+  
+  payments:
+    path: /v1/payments/initiate
     method: POST
-    idempotency: Required (Idempotency-Key header)
+    requirements:
+      - Idempotency-Key Header
+      - TLS 1.3
+    
 error_handling:
-  format: RFC 7807 (Problem Details)
-  codes:
-    400: Validation Failure
-    401: Invalid Token
-    429: Rate Limit Exceeded`
+  standard: RFC 7807 (Problem Details for HTTP APIs)
+  mapping:
+    400: "Validation Error - Check schema"
+    401: "Unauthorized - Invalid or expired token"
+    403: "Forbidden - Insufficient scopes"
+    429: "Too Many Requests - Backoff required"
+    500: "Internal Error - Trace ID logged"`
   },
   {
     id: '5',
@@ -121,31 +172,53 @@ error_handling:
     lastUpdated: new Date().toISOString(),
     version: 4,
     history: [],
-    expertise: `infrastructure:
-  orchestrator: Kubernetes (EKS)
-  iac: Terraform
-  cicd: GitHub Actions -> ArgoCD
-services:
-  core_api:
-    lang: Node.js (NestJS)
-    scaling: HPA (CPU > 70%)
-  billing_worker:
-    lang: Go
+    expertise: `system_architecture:
+  pattern: Microservices
+  orchestration: Kubernetes (EKS)
+  infrastructure_as_code: Terraform
+  ci_cd: GitHub Actions -> ArgoCD
+
+technology_stack:
+  primary_language: Node.js (TypeScript)
+  high_performance_language: Go (Golang)
+  frameworks:
+    - NestJS (Standard REST services)
+    - Fastify (High throughput services)
+
+service_boundaries:
+  identity_service:
+    responsibility: Auth, User Profiles
+    datastore: PostgreSQL (Dedicated)
+  
+  billing_service:
+    responsibility: Invoicing, Payment Gateway integration
     pattern: Event-Driven Consumer
     queue: SQS FIFO
-patterns:
-  resiliency:
-    circuit_breaker:
-      threshold: 50% failure
-      reset_timeout: 30s
-    retry: Exponential Backoff (max 3 attempts)
-  caching:
-    layer_1: Redis (Shared) - TTL 1h
-    layer_2: In-Memory (LRU) - TTL 5m
+  
+  notification_service:
+    responsibility: Email, SMS, Push
+    queue: RabbitMQ (Fanout exchange)
+
+resiliency_patterns:
+  circuit_breaker:
+    implementation: Opossum
+    threshold: 50% failure rate
+    reset_timeout: 30s
+  
+  retry_policy:
+    strategy: Exponential Backoff
+    max_attempts: 3
+    jitter: true
+
+caching_strategy:
+  layer_1: Redis (Distributed) - TTL 1 hour
+  layer_2: In-Memory (LRU) - TTL 5 minutes
+  invalidation: Event-based (Cache-aside)
+
 observability:
-  metrics: Prometheus
-  tracing: OpenTelemetry
-  logging: ELK Stack`
+  metrics: Prometheus (Golden Signals)
+  tracing: OpenTelemetry (Jaeger)
+  logging: ELK Stack (Structured JSON)`
   },
   {
     id: '3',
@@ -157,27 +230,51 @@ observability:
     lastUpdated: new Date().toISOString(),
     version: 2,
     history: [],
-    expertise: `protocol:
-  transport: Secure WebSocket (WSS)
-  fallback: Long Polling
-  handshake: HTTP Upgrade + JWT Query Param
-state_management:
-  adapter: Redis Pub/Sub (Sharded)
-  sticky_sessions: Enabled (Nginx Hash)
-events:
+    expertise: `connection_protocol:
+  primary: Secure WebSocket (WSS)
+  fallback: Long Polling (HTTP/1.1)
+  handshake: HTTP Upgrade + JWT Validation via Query Param
+
+scalability_design:
+  horizontal_scaling:
+    adapter: Redis Pub/Sub (Sharded)
+    load_balancing: Nginx (IP Hash / Sticky Sessions)
+  limits:
+    max_connections_per_node: 10,000
+    heartbeat_interval: 25s
+    connection_timeout: 60s
+
+event_schema:
+  structure:
+    event: string (namespace:action)
+    payload: object
+    meta:
+      timestamp: number
+      message_id: uuid
+  
   namespaces:
-    /chat:
-      - join_room { roomId }
-      - send_message { text, type }
-      - typing { isTyping }
-    /notifications:
-      - system_alert { level, msg }
-      - task_update { taskId, status }
-scalability:
-  max_connections_per_node: 10,000
-  heartbeat_interval: 25s
-  connection_timeout: 60s
-  backpressure: Drop oldest messages if queue > 100`
+    chat:
+      - chat:join_room { roomId }
+      - chat:send_message { text, type }
+      - chat:typing { isTyping }
+    
+    system:
+      - system:alert { level, msg }
+      - system:maintenance_scheduled { time }
+
+reliability_mechanisms:
+  message_delivery:
+    qos_level: At-most-once (default)
+    guaranteed_delivery: Acknowledge (ACK) protocol for critical alerts
+  
+  backpressure:
+    strategy: Drop oldest messages if user queue > 100
+    alert_threshold: Queue size > 80
+
+presence_system:
+  implementation: Redis HyperLogLog & Sets
+  update_frequency: 30s (Heartbeat)
+  offline_threshold: 60s`
   },
   {
     id: '4',
@@ -189,28 +286,50 @@ scalability:
     lastUpdated: new Date().toISOString(),
     version: 5,
     history: [],
-    expertise: `stack:
+    expertise: `engineering_stack:
   framework: React 19
-  build: Vite
-  styling: TailwindCSS
-  language: TypeScript 5.x
-architecture:
-  pattern: Feature-Sliced Design
-  routing: File-system based
+  build_tool: Vite
+  language: TypeScript 5.x (Strict Mode)
+  styling: TailwindCSS + Class Variance Authority (CVA)
+
+architectural_patterns:
+  structure: Feature-Sliced Design (FSD)
+  routing: File-system based (React Router / TanStack Router)
+  code_splitting: Route-based lazy loading
+
 state_management:
-  server_state: TanStack Query (staleTime: 5m)
-  global_ui: Zustand
-  form_state: React Hook Form + Zod
+  server_state: 
+    library: TanStack Query (React Query)
+    stale_time: 5 minutes
+    cache_time: 30 minutes
+  
+  client_state:
+    library: Zustand
+    usage: Global UI settings, Auth tokens
+  
+  form_state:
+    library: React Hook Form
+    validation: Zod Schema Integration
+
 performance_budget:
-  LCP: < 2.5s
-  CLS: < 0.1
-  FID: < 100ms
+  core_web_vitals:
+    LCP: < 2.5s
+    CLS: < 0.1
+    FID: < 100ms
   bundle_size:
-    initial: < 200KB (gzipped)
+    entry_point: < 200KB (gzipped)
+    chunks: < 50KB
+
 component_library:
-  atomic_design: true
-  accessibility: WCAG 2.1 AA Compliant
-  testing: Vitest + Testing Library`
+  philosophy: Atomic Design
+  accessibility: 
+    standard: WCAG 2.1 AA
+    testing: axe-core automated checks
+  
+testing_strategy:
+  unit: Vitest (Logic & Utils)
+  component: React Testing Library
+  e2e: Playwright (Critical user journeys)`
   }
 ];
 
