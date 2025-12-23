@@ -1,3 +1,4 @@
+
 export enum ExpertType {
   DATABASE = 'Database',
   API = 'API',
@@ -75,4 +76,14 @@ export interface ChatMessage {
   role: 'user' | 'model' | 'system';
   text: string;
   timestamp: number;
+}
+
+export interface WarRoomMessage {
+  id: string;
+  speakerId: string;
+  speakerName: string;
+  role: 'expert' | 'moderator';
+  content: string;
+  timestamp: number;
+  isConsensus?: boolean;
 }

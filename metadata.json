@@ -1,5 +1,7 @@
 {
   "name": "Agent Expert System",
   "description": "A dashboard for managing and interacting with self-improving AI agents that maintain and evolve their own mental models (YAML expertise).",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

@@ -1,5 +1,5 @@
 import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
-import { Expert } from '../types';
+import { Expert, WarRoomMessage } from '../types';
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
@@ -305,5 +305,134 @@ export const generateMetaContent = async (
   } catch (error) {
     console.error("Meta Generation Error:", error);
     return "Error generating content. Please check logs.";
+  }
+};
+
+export const generateMermaidDiagram = async (
+  expertiseYaml: string,
+  expertType: string
+): Promise<string> => {
+  try {
+    const ai = getAiClient();
+    const model = 'gemini-3-flash-preview';
+
+    const systemInstruction = `
+      You are a Data Visualization Expert specializing in Mermaid.js.
+      Your task is to convert text-based mental models (YAML) into clear, syntactically correct Mermaid diagrams.
+    `;
+
+    const prompt = `
+      Expert Domain: ${expertType}
+      Mental Model (YAML):
+      \`\`\`yaml
+      ${expertiseYaml}
+      \`\`\`
+
+      Instructions:
+      1. Analyze the YAML structure.
+      2. Choose the best Mermaid diagram type for this domain:
+         - DATABASE: Use 'erDiagram' to show entities and relationships.
+         - API/BACKEND/WEBSOCKET: Use 'sequenceDiagram' for flows or 'graph TD' for architecture/state.
+         - FRONTEND: Use 'graph TD' or 'classDiagram' for component hierarchy.
+         - GENERAL: Use 'mindmap' or 'graph LR'.
+      3. Generate the Mermaid code.
+      4. IMPORTANT: Return ONLY the raw Mermaid code. Do not wrap in markdown backticks. Do not add explanations.
+      5. Ensure labels are concise.
+    `;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: { systemInstruction }
+    });
+
+    let code = response.text?.trim() || "";
+    code = code.replace(/^```mermaid/, '').replace(/^```/, '').replace(/```$/, '');
+    
+    return code;
+  } catch (error) {
+    console.error("Diagram Generation Error:", error);
+    return "graph TD\nError[Failed to generate diagram]";
+  }
+};
+
+// --- WAR ROOM LOGIC ---
+
+export const getWarRoomTurn = async (
+  problem: string,
+  history: WarRoomMessage[],
+  experts: Expert[]
+): Promise<{ speakerId: string; speakerName: string; content: string; isConsensus: boolean }> => {
+  try {
+    const ai = getAiClient();
+    const model = 'gemini-3-flash-preview';
+
+    // Construct context of who is in the room
+    const expertsContext = experts.map(e => `
+      ID: ${e.id}
+      Name: ${e.name}
+      Type: ${e.type}
+      Mental Model Summary: ${e.description}
+      Expertise Preview: ${e.expertise.substring(0, 300)}... (truncated)
+    `).join('\n---\n');
+
+    // Construct Transcript
+    const transcript = history.map(h => `${h.speakerName} (${h.role}): ${h.content}`).join('\n');
+
+    const systemInstruction = `
+      You are the Moderator (System) of an AI Expert War Room.
+      Your goal is to orchestrate a debate to solve the user's problem.
+
+      Participants (Experts):
+      ${expertsContext}
+
+      User Problem: "${problem}"
+
+      Rules:
+      1. Decide who should speak next based on the transcript.
+      2. If a specific expert needs to provide technical details, simulate that expert (speak AS them).
+      3. If the experts have debated enough and a solution is clear, YOU (Moderator) speak to summarize the consensus.
+      4. Keep turns concise (under 50 words unless providing code/schema).
+      5. Encourage conflict/correction if an expert is wrong.
+      6. Do NOT repeat the same speaker twice in a row unless they are clarifying.
+    `;
+
+    const prompt = `
+      Current Transcript:
+      ${transcript}
+
+      Task: Generate the next turn.
+      
+      Return JSON:
+      {
+        "speakerId": "ID of the expert speaking OR 'moderator'",
+        "speakerName": "Name of expert OR 'Moderator'",
+        "content": "The message content (in first person as the speaker)",
+        "isConsensus": boolean (true ONLY if the Moderator is providing the final solution)
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json"
+      }
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("No response");
+    
+    return JSON.parse(jsonText);
+
+  } catch (error) {
+    console.error("War Room Error:", error);
+    return {
+      speakerId: 'moderator',
+      speakerName: 'Moderator',
+      content: 'Communication link disrupted. Ending session.',
+      isConsensus: true
+    };
   }
 };

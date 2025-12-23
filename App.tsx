@@ -13,7 +13,9 @@ import {
   Users,
   Plus,
   Bot,
-  Network
+  Network,
+  Swords,
+  Headset
 } from 'lucide-react';
 import ExpertCard from './components/ExpertCard';
 import ExpertiseModal from './components/ExpertiseModal';
@@ -21,6 +23,8 @@ import ChatModal from './components/ChatModal';
 import MetaActionModal, { MetaActionType } from './components/MetaActionModal';
 import CreateExpertModal from './components/CreateExpertModal';
 import TrainExpertModal from './components/TrainExpertModal';
+import WarRoomModal from './components/WarRoomModal';
+import VoiceCallModal from './components/VoiceCallModal';
 import TaskQueueWidget from './components/TaskQueueWidget';
 import { Expert, ExpertStatus, ExpertType, LogEntry, ChatMessage, ExpertiseHistory, AgentTask, TaskPriority, TaskStatus } from './types';
 import { chatWithExpert, selfImproveExpert, trainExpert as trainExpertService } from './services/geminiService';
@@ -163,6 +167,8 @@ const App: React.FC = () => {
   const [trainingExpert, setTrainingExpert] = useState<Expert | null>(null);
   const [activeMetaAction, setActiveMetaAction] = useState<MetaActionType | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isWarRoomOpen, setIsWarRoomOpen] = useState(false);
+  const [isVoiceCallOpen, setIsVoiceCallOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   // We'll use a ref to track chat messages to avoid closure staleness in async task execution
   const chatMessagesRef = useRef<ChatMessage[]>([]);
@@ -496,11 +502,23 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-6">
+              <button 
+                onClick={() => setIsVoiceCallOpen(true)}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-bold text-sm transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transform hover:-translate-y-0.5"
+                title="Voice Neural Link"
+              >
+                <Headset className="w-4 h-4" />
+                <span className="hidden sm:inline">Voice Link</span>
+              </button>
+              <button 
+                onClick={() => setIsWarRoomOpen(true)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-lg shadow-red-200 hover:shadow-red-300 transform hover:-translate-y-0.5"
+              >
+                <Swords className="w-4 h-4" />
+                War Room
+              </button>
               <a href="#" className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
                 <BookOpen className="w-4 h-4" /> Docs
-              </a>
-              <a href="#" className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
-                <Github className="w-4 h-4" /> GitHub
               </a>
             </div>
           </div>
@@ -837,6 +855,18 @@ const App: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={handleCreateNewExpert}
+      />
+
+      <WarRoomModal 
+        isOpen={isWarRoomOpen} 
+        onClose={() => setIsWarRoomOpen(false)}
+        experts={experts.filter(e => e.status !== ExpertStatus.IDLE)} 
+      />
+
+      <VoiceCallModal 
+        isOpen={isVoiceCallOpen}
+        onClose={() => setIsVoiceCallOpen(false)}
+        experts={experts.filter(e => e.status !== ExpertStatus.IDLE)}
       />
 
     </div>

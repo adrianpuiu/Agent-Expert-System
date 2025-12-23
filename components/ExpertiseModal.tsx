@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, RotateCcw, Copy, Check, FileText, GitCommit, FileDiff, ArrowRight, History, Clock } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, RotateCcw, Copy, Check, FileText, GitCommit, FileDiff, ArrowRight, History, Clock, Workflow, Loader2, Maximize2, Sparkles } from 'lucide-react';
 import { Expert, ExpertiseHistory } from '../types';
+import { generateMermaidDiagram } from '../services/geminiService';
+import MermaidDiagram from './MermaidDiagram';
 
 interface ExpertiseModalProps {
   isOpen: boolean;
@@ -23,18 +25,15 @@ const computeDiff = (oldText: string, newText: string): DiffLine[] => {
   let i = 0;
   let j = 0;
 
-  // Very basic LCS-like approximation for visualization
   while (i < oldLines.length || j < newLines.length) {
     if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
       diff.push({ type: 'same', content: oldLines[i] });
       i++;
       j++;
     } else if (j < newLines.length && (!oldLines[i] || newLines[j] !== oldLines[i+1])) {
-      // Assume addition if it doesn't match next old line
       diff.push({ type: 'added', content: newLines[j] });
       j++;
     } else if (i < oldLines.length) {
-      // Assume removal
       diff.push({ type: 'removed', content: oldLines[i] });
       i++;
     }
@@ -44,16 +43,45 @@ const computeDiff = (oldText: string, newText: string): DiffLine[] => {
 
 const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert, onRevert }) => {
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'code' | 'diff'>('code');
+  const [viewMode, setViewMode] = useState<'code' | 'diff' | 'visual'>('code');
   const [copied, setCopied] = useState(false);
+  
+  // Diagram State
+  const [diagramCode, setDiagramCode] = useState<string | null>(null);
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+  const diagramCache = useRef<Record<string, string>>({});
 
   // Reset selected version when modal opens/expert changes
   useEffect(() => {
     if (isOpen) {
       setSelectedVersion(expert.version);
       setViewMode('code');
+      setDiagramCode(null);
     }
   }, [isOpen, expert]);
+
+  // Handle Diagram Generation when tab is switched or version changes
+  useEffect(() => {
+    if (viewMode === 'visual' && selectedVersion !== null) {
+      const selectedContent = fullHistory.find(h => h.version === selectedVersion)?.content;
+      if (!selectedContent) return;
+
+      const cacheKey = `${expert.id}-v${selectedVersion}`;
+      
+      if (diagramCache.current[cacheKey]) {
+        setDiagramCode(diagramCache.current[cacheKey]);
+      } else {
+        setIsGeneratingDiagram(true);
+        generateMermaidDiagram(selectedContent, expert.type)
+          .then(code => {
+            diagramCache.current[cacheKey] = code;
+            setDiagramCode(code);
+          })
+          .catch(err => console.error(err))
+          .finally(() => setIsGeneratingDiagram(false));
+      }
+    }
+  }, [viewMode, selectedVersion, expert.id]);
 
   // Construct full history list (Current + Past) sorted descending
   const fullHistory = useMemo(() => {
@@ -272,6 +300,15 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
                    <FileDiff className="w-3.5 h-3.5" />
                    Changes
                  </button>
+                 <button
+                   onClick={() => setViewMode('visual')}
+                   className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                     viewMode === 'visual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                   }`}
+                 >
+                   <Workflow className="w-3.5 h-3.5" />
+                   Visual
+                 </button>
               </div>
             </div>
 
@@ -295,7 +332,7 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
           </div>
           
           {/* Content Viewer */}
-          <div className="flex-1 relative bg-[#1e1e1e] group overflow-hidden flex flex-col">
+          <div className={`flex-1 relative group overflow-hidden flex flex-col ${viewMode === 'visual' ? 'bg-white' : 'bg-[#1e1e1e]'}`}>
             
             {/* Copy Button (Only on Source view) */}
             {viewMode === 'code' && (
@@ -316,8 +353,33 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
               </div>
             )}
 
-            <div className="flex-1 overflow-auto custom-scrollbar p-6 font-mono text-sm leading-relaxed">
-              {viewMode === 'code' ? renderHighlightedYaml(currentViewedContent) : renderDiff()}
+            <div className="flex-1 overflow-auto custom-scrollbar font-mono text-sm leading-relaxed">
+              {viewMode === 'code' && (
+                 <div className="p-6">{renderHighlightedYaml(currentViewedContent)}</div>
+              )}
+              {viewMode === 'diff' && (
+                 <div className="p-6">{renderDiff()}</div>
+              )}
+              {viewMode === 'visual' && (
+                <div className="w-full h-full flex flex-col">
+                  {isGeneratingDiagram ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 rounded-full animate-pulse" />
+                        <Loader2 className="w-8 h-8 animate-spin text-indigo-500 relative z-10" />
+                      </div>
+                      <p className="text-sm font-medium">Generating Visual Mental Model...</p>
+                      <p className="text-xs opacity-70">Converting YAML to Architecture Diagram</p>
+                    </div>
+                  ) : diagramCode ? (
+                    <MermaidDiagram code={diagramCode} />
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-gray-400">
+                      <p>Unable to generate diagram.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -329,8 +391,13 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Removed</span>
                  </>
                )}
+               {viewMode === 'visual' && (
+                 <span className="flex items-center gap-1.5 text-indigo-600 font-medium">
+                   <Sparkles className="w-3 h-3" /> AI Generated Diagram
+                 </span>
+               )}
              </div>
-             <span className="font-mono">YAML</span>
+             <span className="font-mono">{viewMode === 'visual' ? 'MERMAID.JS' : 'YAML'}</span>
           </div>
         </div>
       </div>
