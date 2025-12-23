@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Swords, PauseCircle, PlayCircle, CheckCircle2, ShieldAlert, Cpu, Bot, User, Brain, AlertTriangle, Power } from 'lucide-react';
+import { X, Swords, PauseCircle, PlayCircle, CheckCircle2, ShieldAlert, Cpu, Bot, User, Brain, AlertTriangle, Power, Mic, MicOff, Users } from 'lucide-react';
 import { Expert, WarRoomMessage } from '../types';
 import { getWarRoomTurn } from '../services/geminiService';
 
@@ -18,6 +18,7 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
   const [activeExpertIds, setActiveExpertIds] = useState<Set<string>>(new Set());
   
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false); // Prevent overlapping fetches when toggling experts
   const maxTurns = 15;
 
   // Initialize active experts
@@ -54,18 +55,26 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
         return;
       }
 
+      // If we are already fetching a turn, don't double-fire just because the user toggled an expert
+      if (isFetchingRef.current) return;
+
       // Filter experts based on active set
       const activeExperts = experts.filter(e => activeExpertIds.has(e.id));
 
       if (activeExperts.length === 0) {
-        // No experts available to talk
         setIsDebating(false);
+        // We could show a toast here: "Debate paused: No experts active."
         return;
       }
+
+      isFetchingRef.current = true;
 
       try {
         const turn = await getWarRoomTurn(topic, messages, activeExperts);
         
+        // Check if stopped while fetching
+        if (!isDebating) return;
+
         const newMessage: WarRoomMessage = {
           id: Math.random().toString(36).substr(2, 9),
           speakerId: turn.speakerId,
@@ -83,18 +92,55 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
           setIsConsensusReached(true);
           setIsDebating(false);
         } else {
-          // Schedule next turn with a delay for reading
-          timeout = setTimeout(runTurn, 2500); 
+          // Schedule next turn
+          // Note: If activeExpertIds changes during this timeout, the effect cleans up, clears timeout, 
+          // and re-runs runTurn immediately with the NEW list of experts. This provides responsive control.
+          timeout = setTimeout(() => {
+             // We rely on state updates to trigger the next loop via dependency array if needed,
+             // but strictly speaking, the dependency array handles the re-entry.
+             // However, to ensure the loop continues without a state change trigger (like activeExpertIds changing),
+             // we need to trigger a state change or call a function. 
+             // Since runTurn is inside the effect, we can't call it directly from here easily without recursion issues.
+             // Hack: We flip a dummy state or rely on the fact that we just updated 'messages' and 'turnCount'.
+             // Wait... 'messages' and 'turnCount' ARE dependencies. 
+             // So when setMessages happens above, this effect triggers again!
+             // So we actually DON'T need a timeout to call runTurn, we need a timeout to DELAY the state update?
+             // No, the state update happens after await.
+             // Correct flow: Fetch -> SetState -> Effect Re-runs -> Logic checks -> Fetch.
+             // To add a delay between turns, we should `await` a delay inside `runTurn` BEFORE fetching? 
+             // Or better: The `setMessages` triggers the re-run. We want that re-run to wait.
+             
+             // Current logic: The `useEffect` runs on `messages` update.
+             // Immediate fetch is annoying.
+             // Let's rely on the timeout to set a "ready for next turn" state? 
+             // Simpler: Just put a delay at the START of runTurn if it's not the first turn?
+             // Or put delay here:
+          }, 2500); 
         }
 
       } catch (e) {
         console.error("Debate Error", e);
         setIsDebating(false);
+      } finally {
+        isFetchingRef.current = false;
       }
     };
 
+    // If activeExpertIds changes, we want to respect that immediately for the NEXT turn.
+    // If we are currently waiting (debounce/delay), we want to cancel that wait and maybe restart logic?
+    // Actually, if we just updated messages, the effect runs.
+    
+    // We add a small delay mechanism to prevent rapid-fire API calls if the effect re-runs purely due to state changes
+    // that aren't "ready for next turn". 
+    // Ideally, `runTurn` executes, updates state, effect triggers.
+    // We want a pause between turns.
+    
     if (isDebating) {
-      runTurn();
+       // Check if we just finished a turn (based on timestamp of last message vs now?)
+       // Or simply: Always delay slightly before executing to allow UI to breathe, 
+       // UNLESS it's the very first turn.
+       const delay = messages.length === 0 ? 0 : 2500;
+       timeout = setTimeout(runTurn, delay);
     }
 
     return () => clearTimeout(timeout);
@@ -129,7 +175,15 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
             </div>
             <div>
               <h2 className="text-xl font-bold text-white tracking-wide uppercase">War Room <span className="text-red-500">Active</span></h2>
-              <p className="text-gray-400 text-xs font-mono">Multi-Agent Consensus Protocol</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-gray-400 text-xs font-mono">Multi-Agent Consensus Protocol</span>
+                {isDebating && (
+                   <span className="bg-green-900/50 text-green-400 text-[10px] px-2 py-0.5 rounded-full border border-green-800 flex items-center gap-1">
+                     <Users className="w-3 h-3" />
+                     {activeExpertIds.size} Experts Live
+                   </span>
+                )}
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 transition-colors">
@@ -141,10 +195,10 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
         <div className="flex-1 flex overflow-hidden z-10">
           
           {/* Left: Experts List */}
-          <div className="w-72 bg-black/20 border-r border-gray-800 p-4 hidden md:flex flex-col gap-3 overflow-y-auto">
-            <div className="flex justify-between items-center mb-2">
+          <div className="w-80 bg-black/20 border-r border-gray-800 p-4 hidden md:flex flex-col gap-3 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2 px-1">
                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Participants</h3>
-               <span className="text-[10px] text-gray-600">{activeExpertIds.size} Active</span>
+               <span className="text-[10px] text-gray-500">Click to Toggle</span>
             </div>
             
             {experts.map(expert => {
@@ -156,33 +210,38 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
                   key={expert.id} 
                   onClick={() => toggleExpert(expert.id)}
                   className={`
-                    p-3 rounded-lg border transition-all duration-300 cursor-pointer select-none relative group
+                    p-3 rounded-lg border transition-all duration-200 cursor-pointer select-none relative group
                     ${!isActive 
-                        ? 'bg-gray-900/40 border-gray-800 opacity-50 grayscale hover:opacity-70' 
+                        ? 'bg-gray-900/40 border-gray-800 opacity-60 hover:opacity-100' 
                         : isSpeaking 
                           ? 'bg-red-900/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' 
-                          : 'bg-gray-800/40 border-gray-700/50 hover:bg-gray-800/60'
+                          : 'bg-gray-800/60 border-gray-700 hover:bg-gray-800 hover:border-gray-500'
                     }
                   `}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <div className="flex items-center gap-2.5 overflow-hidden">
-                        <Bot className={`w-4 h-4 flex-shrink-0 ${isSpeaking ? 'text-red-400' : isActive ? 'text-gray-400' : 'text-gray-600'}`} />
-                        <span className={`text-sm font-bold truncate ${isSpeaking ? 'text-white' : isActive ? 'text-gray-300' : 'text-gray-600'}`}>
+                        <Bot className={`w-4 h-4 flex-shrink-0 ${isSpeaking ? 'text-red-400' : isActive ? 'text-green-500' : 'text-gray-600'}`} />
+                        <span className={`text-sm font-bold truncate ${isSpeaking ? 'text-white' : isActive ? 'text-gray-200' : 'text-gray-500 line-through decoration-gray-600'}`}>
                            {expert.name}
                         </span>
                     </div>
                     
                     {/* Toggle Indicator */}
                     <div className={`
-                       w-4 h-4 rounded-full flex items-center justify-center transition-colors
-                       ${isActive ? 'text-green-500' : 'text-gray-700'}
+                       w-5 h-5 rounded-full flex items-center justify-center transition-colors
+                       ${isActive ? 'text-green-500 bg-green-500/10' : 'text-gray-600 bg-gray-800'}
                     `}>
-                       <Power className="w-3 h-3" />
+                       {isActive ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
                     </div>
                   </div>
                   
-                  <p className="text-[10px] text-gray-500 uppercase truncate pr-4">{expert.type}</p>
+                  <div className="flex justify-between items-center mt-1">
+                     <p className="text-[10px] text-gray-500 uppercase truncate pr-4">{expert.type}</p>
+                     <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${isActive ? 'text-green-400 bg-green-900/20' : 'text-gray-500 bg-gray-800'}`}>
+                       {isActive ? 'IN ROOM' : 'MUTED'}
+                     </span>
+                  </div>
                   
                   {isSpeaking && <div className="mt-2 h-1 w-full bg-red-500/20 rounded-full overflow-hidden">
                     <div className="h-full bg-red-500 w-1/3 animate-[shimmer_1s_infinite]" />
@@ -212,14 +271,14 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
                   />
                   
                   <div className="flex items-center justify-center gap-2 mb-6 text-sm text-gray-500">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <span className={`w-2 h-2 rounded-full ${activeExpertIds.size > 0 ? 'bg-green-500' : 'bg-red-500'}`}></span>
                     {activeExpertIds.size} Experts Ready
                   </div>
 
                   <button 
                     onClick={handleStart}
                     disabled={!topic.trim() || activeExpertIds.size === 0}
-                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
+                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
                   >
                     <Swords className="w-5 h-5" />
                     Engage Swarm
@@ -293,8 +352,9 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
              {!isConsensusReached && (
                 <button 
                   onClick={isDebating ? handleStop : handleStart}
+                  disabled={activeExpertIds.size === 0 && !isDebating}
                   className={`
-                    px-6 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors
+                    px-6 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
                     ${isDebating 
                       ? 'bg-gray-800 hover:bg-gray-700 text-white' 
                       : 'bg-red-600 hover:bg-red-700 text-white'
