@@ -72,10 +72,16 @@ export interface LogEntry {
   timestamp: string;
 }
 
+export interface SearchSource {
+  title: string;
+  uri: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'model' | 'system';
   text: string;
   timestamp: number;
+  sources?: SearchSource[];
 }
 
 export interface WarRoomMessage {

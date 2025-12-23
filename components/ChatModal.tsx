@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Bot, User, Loader2, Sparkles, Users } from 'lucide-react';
+import { X, Send, Bot, User, Loader2, Sparkles, Users, Globe, ExternalLink } from 'lucide-react';
 import { Expert, ChatMessage, ExpertStatus } from '../types';
 
 interface ChatModalProps {
@@ -83,14 +83,36 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, expert, onSendMe
             }
 
             return (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`
-                  max-w-[80%] rounded-2xl px-4 py-3 text-sm
+                  max-w-[85%] rounded-2xl px-4 py-3 text-sm
                   ${msg.role === 'user' 
                     ? 'bg-orange-600 text-white rounded-tr-none' 
                     : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'}
                 `}>
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                  
+                  {/* Sources Display */}
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+                      <div className="w-full text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                        <Globe className="w-3 h-3" /> Sources
+                      </div>
+                      {msg.sources.map((source, i) => (
+                        <a 
+                          key={i} 
+                          href={source.uri} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-[10px] text-gray-600 transition-colors max-w-full truncate"
+                          title={source.title}
+                        >
+                           <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                           <span className="truncate max-w-[150px]">{source.title || 'Web Source'}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -1,5 +1,5 @@
-import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
-import { Expert, WarRoomMessage } from '../types';
+import { GoogleGenAI, FunctionDeclaration, Type, Tool } from "@google/genai";
+import { Expert, WarRoomMessage, SearchSource } from '../types';
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
@@ -15,7 +15,16 @@ interface ChatResponse {
     withExpertName: string;
     reason: string;
   };
+  sources?: SearchSource[];
 }
+
+// Helper to extract sources from grounding metadata
+const extractSources = (response: any): SearchSource[] => {
+  return response.candidates?.[0]?.groundingMetadata?.groundingChunks
+    ?.map((c: any) => c.web)
+    .filter((w: any) => w)
+    .map((w: any) => ({ title: w.title, uri: w.uri })) || [];
+};
 
 export const chatWithExpert = async (
   expert: Expert, 
@@ -28,13 +37,14 @@ export const chatWithExpert = async (
     const ai = getAiClient();
     const model = 'gemini-3-flash-preview';
     
-    // 1. Prepare Consultation Tool
+    // 1. Prepare Tools
+    // Enable Google Search for external grounding
+    const tools: Tool[] = [{ googleSearch: {} }];
+
+    // Enable Expert Consultation
     const otherExperts = availableExperts.filter(e => e.id !== expert.id);
     const peersContext = otherExperts.map(e => `- ${e.name} (${e.type}): ${e.description}`).join('\n');
     
-    let tools = undefined;
-    
-    // Only register the tool if there are colleagues to consult
     if (otherExperts.length > 0) {
         const consultTool: FunctionDeclaration = {
           name: "consult_expert",
@@ -55,7 +65,7 @@ export const chatWithExpert = async (
             required: ["expertName", "reason"]
           }
         };
-        tools = [{ functionDeclarations: [consultTool] }];
+        tools.push({ functionDeclarations: [consultTool] });
     }
 
     const systemInstruction = `
@@ -67,14 +77,17 @@ export const chatWithExpert = async (
       ${expert.expertise}
       ---
 
-      You have access to these colleagues:
+      You have access to:
+      1. Google Search: Use this to find real-time info, documentation, or facts to verify your answers.
+      2. Colleagues:
       ${peersContext}
 
       Rules:
       1. Answer questions primarily using your own mental model.
-      2. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool to get their mental model.
-      3. Do not fake information.
-      4. Be concise and professional.
+      2. If you need external facts (docs, news, versions), use Google Search.
+      3. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool to get their mental model.
+      4. Do not fake information.
+      5. Be concise and professional.
     `;
 
     // Flatten history for context
@@ -85,7 +98,7 @@ export const chatWithExpert = async (
       User: ${userMessage}
     `;
 
-    // 2. First Pass: Generate with Tool
+    // 2. First Pass: Generate with Tools
     const firstResponse = await ai.models.generateContent({
       model,
       contents: conversationContext,
@@ -116,6 +129,7 @@ export const chatWithExpert = async (
 
         if (targetExpert) {
           // 4. Second Pass: Generate Answer with Shared Knowledge
+          // We keep Google Search enabled here too so it can ground the combined info if needed.
           const collaborationPrompt = `
             ${conversationContext}
 
@@ -134,7 +148,8 @@ export const chatWithExpert = async (
             model,
             contents: collaborationPrompt,
             config: { 
-              systemInstruction // Maintain persona
+              systemInstruction, // Maintain persona
+              tools: [{ googleSearch: {} }] // Keep search enabled for the synthesis
             }
           });
 
@@ -143,15 +158,17 @@ export const chatWithExpert = async (
             collaboration: {
               withExpertName: targetExpert.name,
               reason: reason
-            }
+            },
+            sources: extractSources(secondResponse)
           };
         }
       }
     }
 
-    // Default: No tool used, just return text
+    // Default: No tool used or just Search used, return text
     return {
-      text: firstResponse.text || "I couldn't process that request."
+      text: firstResponse.text || "I couldn't process that request.",
+      sources: extractSources(firstResponse)
     };
 
   } catch (error) {
@@ -181,12 +198,13 @@ export const selfImproveExpert = async (
       "${recentInteraction}"
 
       Task:
-      1. Analyze the interaction. Did the agent learn something new? Did it realize a gap in its knowledge?
-      2. Update the YAML mental model to incorporate new insights, refine definitions, or add new keys.
-      3. Keep the YAML valid.
-      4. Return the response in JSON format with two fields:
+      1. Use Google Search to verify any technical details, look up latest documentation versions, or find best practices related to the context.
+      2. Analyze the interaction and your search results. Did the agent learn something new?
+      3. Update the YAML mental model to incorporate new insights, refine definitions, or add new keys.
+      4. Keep the YAML valid.
+      5. Return the response in JSON format with two fields:
          - "newExpertise": The full updated YAML string.
-         - "summary": A short 1-sentence description of what was learned.
+         - "summary": A short 1-sentence description of what was learned (mention if external sources were used).
 
       If nothing new was learned, return the original YAML and a summary stating "No significant changes."
     `;
@@ -195,7 +213,8 @@ export const selfImproveExpert = async (
       model,
       contents: prompt,
       config: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }] // Enable search for learning
       }
     });
 

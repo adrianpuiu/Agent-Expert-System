@@ -342,7 +342,12 @@ const App: React.FC = () => {
                  }]);
                  addLog(expert.id, expert.name, 'Collaboration', `Consulted ${response.collaboration.withExpertName} regarding: "${response.collaboration.reason}"`);
                }
-               setChatMessages(prev => [...prev, { role: 'model', text: response.text, timestamp: Date.now() }]);
+               setChatMessages(prev => [...prev, { 
+                   role: 'model', 
+                   text: response.text, 
+                   timestamp: Date.now(),
+                   sources: response.sources
+               }]);
             }
             addLog(expert.id, expert.name, 'Queried', `Answered: "${message.substring(0, 30)}..."`);
             break;
