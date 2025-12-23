@@ -67,7 +67,7 @@ export interface LogEntry {
   id: string;
   expertId: string;
   expertName: string;
-  action: 'Created' | 'Self-Improved' | 'Queried' | 'Error' | 'Collaboration' | 'Reverted' | 'Task Queued' | 'Task Complete';
+  action: 'Created' | 'Self-Improved' | 'Queried' | 'Error' | 'Collaboration' | 'Reverted' | 'Task Queued' | 'Task Complete' | 'Tool Used';
   details: string;
   timestamp: string;
 }

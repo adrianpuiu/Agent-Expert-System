@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -7,14 +7,18 @@ import {
   ArrowRight, 
   Check, 
   Copy, 
-  Loader2, 
-  ChevronRight, 
+  RefreshCw, 
+  ArrowLeft, 
   Wand2, 
-  Terminal, 
-  User, 
-  Code,
-  ArrowLeft,
-  RefreshCw
+  Target, 
+  Users, 
+  Shield, 
+  Fingerprint, 
+  BookOpen, 
+  Briefcase,
+  Code2,
+  Terminal,
+  Cpu
 } from 'lucide-react';
 import { generateMetaContent } from '../services/geminiService';
 
@@ -37,12 +41,11 @@ const LOADING_MESSAGES = [
 
 const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type }) => {
   // Wizard State
-  const [step, setStep] = useState<'input' | 'generating' | 'result'>('input');
+  // Steps: 0, 1, 2 (Inputs), 3 (Generating), 4 (Result)
+  const [currentStep, setCurrentStep] = useState(0);
   
-  // Input State
-  const [field1, setField1] = useState('');
-  const [field2, setField2] = useState('');
-  const [field3, setField3] = useState('');
+  // Inputs stored in array for easy indexing
+  const [inputs, setInputs] = useState<string[]>(['', '', '']);
   
   // Result State
   const [result, setResult] = useState('');
@@ -52,11 +55,9 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
   // Reset on open
   useEffect(() => {
     if (isOpen) {
-      setStep('input');
+      setCurrentStep(0);
+      setInputs(['', '', '']);
       setResult('');
-      setField1('');
-      setField2('');
-      setField3('');
       setLoadingMsgIndex(0);
     }
   }, [isOpen, type]);
@@ -64,15 +65,21 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
   // Loading Animation Loop
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (step === 'generating') {
+    if (currentStep === 3) {
       interval = setInterval(() => {
         setLoadingMsgIndex(prev => (prev + 1) % LOADING_MESSAGES.length);
       }, 1500);
     }
     return () => clearInterval(interval);
-  }, [step]);
+  }, [currentStep]);
 
   if (!isOpen || !type) return null;
+
+  const updateInput = (value: string) => {
+    const newInputs = [...inputs];
+    newInputs[currentStep] = value;
+    setInputs(newInputs);
+  };
 
   // Configuration based on Type
   const getConfig = () => {
@@ -84,10 +91,32 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
           icon: <Sparkles className="w-6 h-6 text-white" />,
           color: "from-purple-600 to-indigo-600",
           shadow: "shadow-purple-500/20",
-          fields: [
-            { label: "Core Task / Goal", placeholder: "What is the primary task the AI must accomplish?", type: 'textarea', val: field1, set: setField1 },
-            { label: "Target Audience", placeholder: "Who is this prompt for? (e.g., Developers, 5-year-olds)", type: 'input', val: field2, set: setField2 },
-            { label: "Constraints & Style", placeholder: "Any specific restrictions or tone requirements?", type: 'input', val: field3, set: setField3 }
+          accentColor: "text-purple-600",
+          steps: [
+            { 
+              label: "Core Task", 
+              question: "What is the primary goal?",
+              description: "Define the specific task the AI must accomplish. Be as precise as possible.",
+              icon: Target, 
+              placeholder: "e.g., Create a Python script to scrape stock prices...", 
+              type: 'textarea' 
+            },
+            { 
+              label: "Audience", 
+              question: "Who is this for?",
+              description: "The target audience determines the tone, complexity, and format of the response.",
+              icon: Users, 
+              placeholder: "e.g., Junior Developers, Non-technical stakeholders, 5-year-old...", 
+              type: 'input' 
+            },
+            { 
+              label: "Constraints", 
+              question: "Any boundaries?",
+              description: "Set specific restrictions, style guides, or output formats (JSON, Markdown, etc).",
+              icon: Shield, 
+              placeholder: "e.g., JSON output only, no markdown, professional tone...", 
+              type: 'input' 
+            }
           ]
         };
       case 'agent':
@@ -97,10 +126,32 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
           icon: <Bot className="w-6 h-6 text-white" />,
           color: "from-orange-500 to-red-600",
           shadow: "shadow-orange-500/20",
-          fields: [
-            { label: "Agent Name", placeholder: "e.g., SecurityAuditBot", type: 'input', val: field1, set: setField1 },
-            { label: "Role & Objectives", placeholder: "What is its job? What is it responsible for?", type: 'textarea', val: field2, set: setField2 },
-            { label: "Key Knowledge Areas", placeholder: "What specific domain knowledge does it need?", type: 'textarea', val: field3, set: setField3 }
+          accentColor: "text-orange-600",
+          steps: [
+            { 
+              label: "Identity", 
+              question: "Who is this agent?",
+              description: "Give the agent a name and a high-level persona.",
+              icon: Fingerprint, 
+              placeholder: "e.g., SecurityAuditBot, The Code Reviewer...", 
+              type: 'input' 
+            },
+            { 
+              label: "Role", 
+              question: "What is its purpose?",
+              description: "Describe its responsibilities and what success looks like.",
+              icon: Briefcase, 
+              placeholder: "e.g., Responsible for analyzing smart contracts for vulnerabilities...", 
+              type: 'textarea' 
+            },
+            { 
+              label: "Knowledge", 
+              question: "What does it know?",
+              description: "Define the specific domain knowledge or expertise required.",
+              icon: BookOpen, 
+              placeholder: "e.g., Deep understanding of Solidity, OWASP Top 10, Gas optimization...", 
+              type: 'textarea' 
+            }
           ]
         };
       case 'skill':
@@ -110,10 +161,32 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
           icon: <Zap className="w-6 h-6 text-white" />,
           color: "from-emerald-500 to-teal-600",
           shadow: "shadow-emerald-500/20",
-          fields: [
-            { label: "Function Name", placeholder: "e.g., validateCustomerEmail", type: 'input', val: field1, set: setField1 },
-            { label: "Input Arguments", placeholder: "e.g., email: string, checkMX: boolean", type: 'input', val: field2, set: setField2 },
-            { label: "Logic & Requirements", placeholder: "Describe what the code should do step-by-step...", type: 'textarea', val: field3, set: setField3 }
+          accentColor: "text-emerald-600",
+          steps: [
+            { 
+              label: "Functionality", 
+              question: "What does it do?",
+              description: "Name the function and describe its single responsibility.",
+              icon: Code2, 
+              placeholder: "e.g., validateCustomerEmail", 
+              type: 'input' 
+            },
+            { 
+              label: "Inputs/Outputs", 
+              question: "What goes in and out?",
+              description: "Define arguments, types, and return values.",
+              icon: Terminal, 
+              placeholder: "e.g., email: string, checkMX: boolean -> Promise<boolean>", 
+              type: 'input' 
+            },
+            { 
+              label: "Logic", 
+              question: "How does it work?",
+              description: "Describe the algorithmic steps or business logic required.",
+              icon: Cpu, 
+              placeholder: "e.g., Regex check first, then DNS lookup, handle timeouts...", 
+              type: 'textarea' 
+            }
           ]
         };
     }
@@ -121,24 +194,37 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
 
   const config = getConfig();
 
+  const handleNext = () => {
+    if (currentStep < 2) {
+      setCurrentStep(c => c + 1);
+    } else {
+      handleGenerate();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(c => c - 1);
+    }
+  };
+
   const handleGenerate = async () => {
-    if (!field1.trim()) return;
-    setStep('generating');
+    setCurrentStep(3); // Generating state
     setResult('');
     
     // Construct structured input for the service
     let structuredInput = '';
-    if (type === 'prompt') structuredInput = `Task: ${field1}\nTarget Audience: ${field2}\nConstraints: ${field3}`;
-    if (type === 'agent') structuredInput = `Name: ${field1}\nRole: ${field2}\nKnowledge: ${field3}`;
-    if (type === 'skill') structuredInput = `Function: ${field1}\nInputs: ${field2}\nLogic: ${field3}`;
+    if (type === 'prompt') structuredInput = `Task: ${inputs[0]}\nTarget Audience: ${inputs[1]}\nConstraints: ${inputs[2]}`;
+    if (type === 'agent') structuredInput = `Name: ${inputs[0]}\nRole: ${inputs[1]}\nKnowledge: ${inputs[2]}`;
+    if (type === 'skill') structuredInput = `Function: ${inputs[0]}\nInputs: ${inputs[1]}\nLogic: ${inputs[2]}`;
 
     try {
       const content = await generateMetaContent(type, structuredInput);
       setResult(content);
-      setStep('result');
+      setCurrentStep(4); // Result state
     } catch (e) {
       console.error(e);
-      setStep('input');
+      setCurrentStep(2); // Go back to last input on error
       // In a real app, show error toast
     }
   };
@@ -149,12 +235,14 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const CurrentStepIcon = currentStep < 3 ? config.steps[currentStep].icon : Sparkles;
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[700px] animate-in fade-in zoom-in duration-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[650px] animate-in fade-in zoom-in duration-200 overflow-hidden font-sans">
         
         {/* Header */}
-        <div className={`p-6 bg-gradient-to-r ${config.color} relative overflow-hidden flex-shrink-0`}>
+        <div className={`p-6 bg-gradient-to-r ${config.color} relative overflow-hidden flex-shrink-0 transition-all duration-500`}>
           <div className="absolute top-0 right-0 p-4 opacity-10 transform rotate-12 scale-150 pointer-events-none">
             {config.icon}
           </div>
@@ -177,73 +265,103 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
           </div>
 
           {/* Progress Indicators */}
-          <div className="flex gap-2 mt-6">
-             <div className={`h-1 flex-1 rounded-full bg-white/30 ${step === 'input' ? 'bg-white' : 'bg-white/80'}`} />
-             <div className={`h-1 flex-1 rounded-full bg-white/30 ${step === 'generating' ? 'bg-white animate-pulse' : step === 'result' ? 'bg-white/80' : ''}`} />
-             <div className={`h-1 flex-1 rounded-full bg-white/30 ${step === 'result' ? 'bg-white' : ''}`} />
+          <div className="flex gap-2 mt-8 px-1">
+             {[0, 1, 2].map(idx => (
+               <div 
+                 key={idx}
+                 className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                   currentStep >= idx 
+                    ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' 
+                    : 'bg-black/20'
+                 }`} 
+               />
+             ))}
+             <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                   currentStep >= 3 
+                    ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' 
+                    : 'bg-black/20'
+                 }`} 
+             />
           </div>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col relative">
           
-          {/* STEP 1: INPUT */}
-          {step === 'input' && (
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-8 animate-in slide-in-from-right-8 duration-300">
-              <div className="space-y-6 max-w-3xl mx-auto">
-                 {config.fields.map((field, idx) => (
-                   <div key={idx} className="space-y-2">
-                     <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                       {idx === 0 && <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs">1</span>}
-                       {idx === 1 && <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs">2</span>}
-                       {idx === 2 && <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs">3</span>}
-                       {field.label}
-                     </label>
-                     {field.type === 'textarea' ? (
-                       <textarea
-                         value={field.val}
-                         onChange={(e) => field.set(e.target.value)}
-                         placeholder={field.placeholder}
-                         className="w-full h-32 p-4 rounded-xl border border-gray-200 focus:border-transparent focus:ring-2 focus:ring-opacity-50 focus:outline-none resize-none bg-white shadow-sm transition-all focus:ring-indigo-500 text-gray-800"
-                         autoFocus={idx === 0}
-                       />
-                     ) : (
-                        <input
-                         type="text"
-                         value={field.val}
-                         onChange={(e) => field.set(e.target.value)}
-                         placeholder={field.placeholder}
-                         className="w-full p-4 rounded-xl border border-gray-200 focus:border-transparent focus:ring-2 focus:ring-opacity-50 focus:outline-none bg-white shadow-sm transition-all focus:ring-indigo-500 text-gray-800"
-                       />
-                     )}
-                   </div>
-                 ))}
+          {/* WIZARD INPUT STEPS (0, 1, 2) */}
+          {currentStep < 3 && (
+            <div className="flex-1 flex flex-col p-8 animate-in slide-in-from-right-8 duration-300">
+              <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col justify-center">
+                
+                {/* Step Indicator & Question */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`p-2 rounded-lg bg-white shadow-sm border border-gray-100 ${config.accentColor}`}>
+                      <CurrentStepIcon className="w-6 h-6" />
+                    </div>
+                    <span className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+                      Step {currentStep + 1} of 3
+                    </span>
+                  </div>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-2">
+                    {config.steps[currentStep].question}
+                  </h3>
+                  <p className="text-gray-500 text-lg">
+                    {config.steps[currentStep].description}
+                  </p>
+                </div>
+
+                {/* Input Field */}
+                <div className="relative group">
+                   {config.steps[currentStep].type === 'textarea' ? (
+                     <textarea
+                       value={inputs[currentStep]}
+                       onChange={(e) => updateInput(e.target.value)}
+                       placeholder={config.steps[currentStep].placeholder}
+                       className="w-full h-40 p-6 text-lg rounded-2xl border border-gray-200 focus:border-transparent focus:ring-4 focus:ring-opacity-20 focus:outline-none resize-none bg-white shadow-sm transition-all focus:ring-indigo-500 text-gray-800"
+                       autoFocus
+                     />
+                   ) : (
+                      <input
+                       type="text"
+                       value={inputs[currentStep]}
+                       onChange={(e) => updateInput(e.target.value)}
+                       placeholder={config.steps[currentStep].placeholder}
+                       className="w-full p-6 text-lg rounded-2xl border border-gray-200 focus:border-transparent focus:ring-4 focus:ring-opacity-20 focus:outline-none bg-white shadow-sm transition-all focus:ring-indigo-500 text-gray-800"
+                       autoFocus
+                       onKeyDown={(e) => {
+                         if (e.key === 'Enter' && inputs[currentStep].trim()) handleNext();
+                       }}
+                     />
+                   )}
+                   <div className="absolute inset-0 rounded-2xl pointer-events-none ring-1 ring-inset ring-gray-900/5 group-focus-within:ring-2 group-focus-within:ring-indigo-500/20" />
+                </div>
               </div>
             </div>
           )}
 
-          {/* STEP 2: GENERATING */}
-          {step === 'generating' && (
-            <div className="absolute inset-0 z-10 bg-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-300">
+          {/* GENERATING STATE (3) */}
+          {currentStep === 3 && (
+            <div className="absolute inset-0 z-10 bg-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
                <div className="relative mb-8">
-                  <div className={`absolute inset-0 blur-2xl opacity-20 bg-gradient-to-r ${config.color} rounded-full animate-pulse`} />
-                  <div className="relative p-6 bg-white rounded-2xl shadow-xl border border-gray-100">
-                    <Wand2 className={`w-12 h-12 animate-spin-slow bg-gradient-to-r ${config.color} bg-clip-text text-transparent`} />
+                  <div className={`absolute inset-0 blur-3xl opacity-30 bg-gradient-to-r ${config.color} rounded-full animate-pulse`} />
+                  <div className="relative p-8 bg-white rounded-3xl shadow-2xl border border-gray-100 ring-4 ring-gray-50">
+                    <Wand2 className={`w-16 h-16 animate-spin-slow bg-gradient-to-r ${config.color} bg-clip-text text-transparent`} />
                   </div>
                </div>
                
-               <h3 className="text-xl font-bold text-gray-900 mb-2 min-h-[28px]">
+               <h3 className="text-2xl font-bold text-gray-900 mb-3 min-h-[32px] tracking-tight">
                  {LOADING_MESSAGES[loadingMsgIndex]}
                </h3>
-               <p className="text-gray-500 text-sm max-w-md mx-auto">
-                 Using Gemini 2.0 Flash Thinking to construct high-quality, structured output based on your requirements.
+               <p className="text-gray-500 text-base max-w-md mx-auto leading-relaxed">
+                 The Meta-Agent is synthesizing your inputs into a highly optimized format using Gemini 2.0 Flash Thinking.
                </p>
 
-               <div className="mt-8 flex gap-1">
+               <div className="mt-10 flex gap-1.5">
                  {[0, 1, 2].map(i => (
                    <div 
                     key={i} 
-                    className="w-2.5 h-2.5 rounded-full bg-gray-300 animate-bounce" 
+                    className="w-3 h-3 rounded-full bg-gray-200 animate-bounce" 
                     style={{ animationDelay: `${i * 150}ms` }}
                    />
                  ))}
@@ -251,27 +369,32 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
             </div>
           )}
 
-          {/* STEP 3: RESULT */}
-          {step === 'result' && (
+          {/* RESULT STATE (4) */}
+          {currentStep === 4 && (
             <div className="flex-1 flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
-              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                   <Check className="w-4 h-4 text-green-500" />
+              <div className="p-4 bg-white border-b border-gray-200 flex justify-between items-center shadow-sm z-10">
+                 <div className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
+                   <Check className="w-4 h-4" />
                    Generation Complete
                  </div>
                  <div className="flex gap-2">
                    <button
-                     onClick={() => setStep('input')}
-                     className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                     onClick={() => {
+                       setCurrentStep(0);
+                     }}
+                     className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200"
                    >
                      <RefreshCw className="w-3.5 h-3.5" />
-                     Refine
+                     New
                    </button>
                    <button
                      onClick={handleCopy}
                      className={`
-                       flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all
-                       ${copied ? 'bg-green-100 text-green-700' : 'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700'}
+                       flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all border
+                       ${copied 
+                         ? 'bg-green-50 text-green-700 border-green-200' 
+                         : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                       }
                      `}
                    >
                      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -280,8 +403,8 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
                  </div>
               </div>
               
-              <div className="flex-1 bg-[#1e1e1e] overflow-auto custom-scrollbar p-6">
-                <pre className="font-mono text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
+              <div className="flex-1 bg-[#1e1e1e] overflow-auto custom-scrollbar p-8">
+                <pre className="font-mono text-sm text-gray-300 whitespace-pre-wrap leading-relaxed max-w-4xl mx-auto">
                   <code>{result}</code>
                 </pre>
               </div>
@@ -291,41 +414,55 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
         </div>
 
         {/* Footer Actions */}
-        {step === 'input' && (
+        {currentStep < 3 && (
           <div className="p-6 bg-white border-t border-gray-100 flex justify-between items-center">
              <button 
-               onClick={onClose}
-               className="px-6 py-3 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+               onClick={currentStep === 0 ? onClose : handleBack}
+               className="px-6 py-3 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors flex items-center gap-2"
              >
-               Cancel
+               {currentStep > 0 && <ArrowLeft className="w-4 h-4" />}
+               {currentStep === 0 ? 'Cancel' : 'Back'}
              </button>
-             <button
-               onClick={handleGenerate}
-               disabled={!field1.trim()}
-               className={`
-                 flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all
-                 ${!field1.trim() 
-                    ? 'bg-gray-300 cursor-not-allowed shadow-none' 
-                    : `bg-gradient-to-r ${config.color} ${config.shadow} hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]`
-                 }
-               `}
-             >
-               <Sparkles className="w-4 h-4" />
-               Generate Content
-               <ArrowRight className="w-4 h-4 ml-1" />
-             </button>
+             
+             <div className="flex gap-2">
+               {currentStep < 2 ? (
+                 <button
+                   onClick={handleNext}
+                   disabled={!inputs[currentStep].trim()}
+                   className={`
+                     flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all
+                     ${!inputs[currentStep].trim() 
+                        ? 'bg-gray-300 cursor-not-allowed shadow-none' 
+                        : 'bg-gray-900 hover:bg-black hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
+                     }
+                   `}
+                 >
+                   Next Step
+                   <ArrowRight className="w-4 h-4" />
+                 </button>
+               ) : (
+                 <button
+                   onClick={handleGenerate}
+                   disabled={!inputs[currentStep].trim()}
+                   className={`
+                     flex items-center gap-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all
+                     ${!inputs[currentStep].trim() 
+                        ? 'bg-gray-300 cursor-not-allowed shadow-none' 
+                        : `bg-gradient-to-r ${config.color} ${config.shadow} hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]`
+                     }
+                   `}
+                 >
+                   <Sparkles className="w-4 h-4" />
+                   Generate
+                   <ArrowRight className="w-4 h-4 ml-1" />
+                 </button>
+               )}
+             </div>
           </div>
         )}
 
-        {step === 'result' && (
-          <div className="p-6 bg-white border-t border-gray-100 flex justify-between items-center">
-             <button 
-               onClick={() => setStep('input')}
-               className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-             >
-               <ArrowLeft className="w-4 h-4" />
-               Back to Editor
-             </button>
+        {currentStep === 4 && (
+          <div className="p-6 bg-white border-t border-gray-100 flex justify-end items-center">
              <button
                onClick={onClose}
                className="px-8 py-3 rounded-xl font-bold text-white bg-gray-900 hover:bg-black shadow-lg hover:shadow-xl transition-all"

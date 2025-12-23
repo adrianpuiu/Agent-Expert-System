@@ -15,7 +15,8 @@ import {
   Bot,
   Network,
   Swords,
-  Headset
+  Headset,
+  Globe
 } from 'lucide-react';
 import ExpertCard from './components/ExpertCard';
 import ExpertiseModal from './components/ExpertiseModal';
@@ -468,6 +469,12 @@ const App: React.FC = () => {
                    sources: response.sources
                }]);
             }
+            
+            // Log Tool Usage
+            if (response.sources && response.sources.length > 0) {
+               addLog(expert.id, expert.name, 'Tool Used', `Google Search: Found ${response.sources.length} citations`);
+            }
+            
             addLog(expert.id, expert.name, 'Queried', `Answered: "${message.substring(0, 30)}..."`);
             break;
           }
@@ -496,6 +503,12 @@ const App: React.FC = () => {
               }
               return e;
              }));
+             
+             // Log Search during improvement
+             if (result.sources && result.sources.length > 0) {
+                addLog(expert.id, expert.name, 'Tool Used', `Google Search: Verified knowledge with ${result.sources.length} sources`);
+             }
+             
              addLog(expert.id, expert.name, 'Self-Improved', result.summary);
              break;
           }
@@ -957,6 +970,7 @@ const App: React.FC = () => {
                           log.action === 'Self-Improved' ? 'bg-green-500' :
                           log.action === 'Collaboration' ? 'bg-purple-500' :
                           log.action === 'Reverted' ? 'bg-yellow-500' :
+                          log.action === 'Tool Used' ? 'bg-sky-500' :
                           log.action === 'Error' ? 'bg-red-500' :
                           'bg-blue-500'
                         }`} />
@@ -966,13 +980,17 @@ const App: React.FC = () => {
                              <span className="text-xs text-gray-400">{new Date(log.timestamp).toLocaleTimeString()}</span>
                           </div>
                           <p className="text-sm text-gray-600 mb-1">
-                            <span className={`uppercase text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded mr-2 ${
+                            <span className={`uppercase text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded mr-2 flex inline-flex items-center gap-1 ${
                               log.action === 'Self-Improved' ? 'bg-green-100 text-green-700' :
                               log.action === 'Collaboration' ? 'bg-purple-100 text-purple-700' :
                               log.action === 'Reverted' ? 'bg-yellow-100 text-yellow-800' :
+                              log.action === 'Tool Used' ? 'bg-sky-100 text-sky-700' :
                               log.action === 'Error' ? 'bg-red-100 text-red-700' :
                               'bg-blue-100 text-blue-700'
-                            }`}>{log.action}</span>
+                            }`}>
+                              {log.action === 'Tool Used' && <Globe className="w-3 h-3" />}
+                              {log.action}
+                            </span>
                             {log.details}
                           </p>
                         </div>

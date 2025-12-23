@@ -84,9 +84,9 @@ export const chatWithExpert = async (
 
       Rules:
       1. Answer questions primarily using your own mental model.
-      2. If you need external facts (docs, news, versions), use Google Search.
-      3. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool to get their mental model.
-      4. Do not fake information.
+      2. ACTIVE SEARCH: If the user asks for current events, specific documentation, library versions, or facts you are not 100% sure about, you MUST use Google Search to verify.
+      3. GROUNDING: When you use search, incorporate the findings naturally into your response.
+      4. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool.
       5. Be concise and professional.
     `;
 
@@ -180,7 +180,7 @@ export const chatWithExpert = async (
 export const selfImproveExpert = async (
   expert: Expert, 
   recentInteraction: string
-): Promise<{ newExpertise: string; summary: string }> => {
+): Promise<{ newExpertise: string; summary: string; sources: SearchSource[] }> => {
   try {
     const ai = getAiClient();
     const model = 'gemini-3-flash-preview';
@@ -224,7 +224,8 @@ export const selfImproveExpert = async (
     const result = JSON.parse(jsonText);
     return {
       newExpertise: result.newExpertise,
-      summary: result.summary
+      summary: result.summary,
+      sources: extractSources(response)
     };
 
   } catch (error) {
@@ -360,11 +361,23 @@ export const generateMermaidDiagram = async (
       }
     });
 
-    const jsonText = response.text;
+    let jsonText = response.text;
     if(!jsonText) return "graph TD\nError[No response from AI]";
+
+    // Clean up potential markdown formatting from JSON response
+    jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    const result = JSON.parse(jsonText);
-    return result.mermaidCode || "graph TD\nError[Invalid JSON response]";
+    try {
+      const result = JSON.parse(jsonText);
+      return result.mermaidCode || "graph TD\nError[Invalid JSON response structure]";
+    } catch (e) {
+      console.error("JSON Parse Error for Diagram:", e);
+      // Fallback: try to extract mermaid code if strictly not JSON
+      if (jsonText.includes("graph ") || jsonText.includes("erDiagram")) {
+        return jsonText;
+      }
+      return "graph TD\nError[Failed to parse diagram JSON]";
+    }
     
   } catch (error) {
     console.error("Diagram Generation Error:", error);
