@@ -42,65 +42,70 @@ const INITIAL_EXPERTS: Expert[] = [
     lastUpdated: new Date().toISOString(),
     version: 3,
     history: [],
-    expertise: `domain_principles:
-  acid_compliance: strict
-  normalization_level: 3NF (default)
-  scaling_strategy: "Vertical first, then Horizontal (Sharding)"
+    expertise: `identity:
+  role: Principal Database Engineer
+  philosophy: "Data integrity is non-negotiable; performance is engineered, not accidental."
 
-architecture:
-  primary_engine: PostgreSQL 16
-  topology:
-    nodes: 3 (1 Primary, 2 Replicas)
-    replication: Streaming (Async)
+core_technology:
+  engine: PostgreSQL 16.2
+  extensions:
+    - pg_stat_statements: "Query performance monitoring"
+    - postgis: "Geospatial data handling"
+    - pg_trgm: "Fuzzy string matching"
+    - pgcrypto: "hashing/encryption within DB"
+    - citus: "Distributed tables (future scale)"
+
+architecture_topology:
+  cluster_configuration:
+    primary: 1 (Write/Read)
+    replicas: 3 (Read-only, Async Streaming)
+    sync_standby: 1 (High Durability candidate)
+  
   connection_pooling:
-    software: PgBouncer
+    layer: PgBouncer
     mode: transaction
-    max_connections: 5000
+    max_client_conn: 10000
+    default_pool_size: 20
+    query_timeout: 15s
 
-schema_registry:
-  users:
-    description: "Core identity and profile data"
-    columns:
-      id: uuid (pk, v4)
-      email: varchar(255) (unique, not_null)
-      password_hash: varchar(255) (argon2id)
-      role: enum('admin', 'user', 'auditor')
-      metadata: jsonb (default: '{}')
-      created_at: timestamp (default: now())
-    indexes:
-      - name: idx_users_email_gin
-        type: GIN (trigram)
-        purpose: "Fuzzy search on emails"
-      - name: idx_users_created_at
-        type: BTREE
-        purpose: "Range queries for analytics"
-
-  orders:
-    description: "Transactional records of purchases"
-    columns:
-      id: bigint (pk, identity)
-      user_id: uuid (fk -> users.id)
-      status: enum('pending', 'paid', 'shipped', 'cancelled')
-      total_cents: integer
-      currency: char(3)
-    partitioning:
-      strategy: RANGE (created_at)
-      interval: "1 month"
-
-operational_policies:
-  performance_tuning:
-    - rule: "No SELECT * in production applications"
-    - rule: "All Foreign Keys must have a supporting index"
-    - rule: "Queries taking > 100ms must be logged and analyzed"
+schema_design_patterns:
+  primary_keys: UUIDv7 (Time-sortable, avoids fragmentation)
+  audit_strategy: 
+    method: Trigger-based (PL/pgSQL)
+    target: audit.record_changes table
+    fields: [user_id, operation, old_val, new_val, timestamp]
   
-  maintenance:
-    autovacuum: aggressive
-    stats_collection: daily
+  partitioning_strategy:
+    time_series_data: DECLARATIVE PARTITIONING BY RANGE (created_at)
+    retention_policy: "Detach partition > 1 year -> Archive to S3 -> Drop"
+
+indexing_strategy:
+  rules:
+    - "Index all Foreign Keys"
+    - "Use Partial Indexes for status flags (e.g., WHERE status != 'archived')"
+    - "Use BRIN indexes for high-velocity append-only timestamps"
+    - "Covering Indexes for frequent read-only queries (INCLUDE clause)"
+
+performance_tuning:
+  shared_buffers: "25% of RAM"
+  effective_cache_size: "75% of RAM"
+  work_mem: "16MB (monitoring temp file usage)"
+  maintenance_work_mem: "1GB"
+  autovacuum:
+    scale_factor: 0.02 (Aggressive for high churn)
+    naptime: 1min
+    vacuum_cost_limit: 2000
+
+operational_playbooks:
+  slow_query_analysis:
+    1: "Check pg_stat_statements for calls > 100ms"
+    2: "EXPLAIN (ANALYZE, BUFFERS) specific query"
+    3: "Check for Seq Scans vs Index Scans"
+    4: "Verify statistics freshness (ANALYZE table_name)"
   
-  disaster_recovery:
-    rpo: "5 minutes"
-    rto: "1 hour"
-    strategy: WAL-G Continuous Archiving to S3`
+  bloat_management:
+    detection: "pgstattuple extension"
+    remediation: "pg_repack (online) or VACUUM FULL (maintenance window)"`
   },
   {
     id: '2',
@@ -112,56 +117,62 @@ operational_policies:
     lastUpdated: new Date().toISOString(),
     version: 2,
     history: [],
-    expertise: `governance:
-  protocols:
-    - REST (Public facing)
-    - GraphQL (Frontend flexibility)
-    - gRPC (Internal microservices)
-  versioning_strategy: URI Path (e.g., /v1/resource)
-  documentation_standard: OpenAPI 3.1
+    expertise: `identity:
+  role: API Platform Architect
+  philosophy: "The API is the product. Consistency, predictability, and safety are paramount."
 
-security_layer:
+governance_framework:
+  style_guide: Zalando RESTful Guidelines
+  versioning:
+    strategy: URI Path (v1, v2)
+    deprecation_policy: "Sunset header + 6 month notice"
+  documentation:
+    spec: OpenAPI 3.1
+    portal: Backstage.io
+    linting: Spectral (OAS linter)
+
+traffic_management:
+  ingress_controller: Kong / Nginx
+  rate_limiting:
+    global: 10,000 req/s
+    per_ip: 60 req/min (Anonymous)
+    per_user: 1000 req/min (Authenticated)
+    strategy: Sliding Window implementation via Redis
+    headers:
+      - X-RateLimit-Limit
+      - X-RateLimit-Remaining
+      - X-RateLimit-Reset
+
+security_perimeter:
   authentication:
-    mechanism: OAuth2 / OpenID Connect
-    provider: Auth0 / Cognito
-    token_format: JWT (RS256 signature)
+    protocol: OAuth 2.1 / OIDC
+    flow: Authorization Code with PKCE
+    token_validation: JWT (Stateless) + JWKS caching
+  
   authorization:
-    model: RBAC (Role-Based Access Control)
-    scopes:
-      - read:profile
-      - write:orders
-  
-  threat_protection:
-    rate_limiting:
-      algorithm: Sliding Window Log
-      public_limit: 60 req/min per IP
-      authenticated_limit: 1000 req/min per User
-    cors:
-      allowed_origins: ["*.myapp.com"]
-      allowed_methods: ["GET", "POST", "PUT", "DELETE"]
+    model: ABAC (Attribute-Based) over RBAC
+    policy_engine: Open Policy Agent (OPA)
+    scopes: granular (resource:action)
 
-endpoint_catalog:
-  analytics:
-    path: /v1/analytics/events
-    method: POST
-    validation: Zod Strict Schema
-    behavior: Fire-and-forget (Async processing)
+resilience_patterns:
+  circuit_breaking:
+    threshold: 50% error rate over 10s
+    recovery: Half-Open state after 30s
   
-  payments:
-    path: /v1/payments/initiate
-    method: POST
-    requirements:
-      - Idempotency-Key Header
-      - TLS 1.3
-    
-error_handling:
-  standard: RFC 7807 (Problem Details for HTTP APIs)
-  mapping:
-    400: "Validation Error - Check schema"
-    401: "Unauthorized - Invalid or expired token"
-    403: "Forbidden - Insufficient scopes"
-    429: "Too Many Requests - Backoff required"
-    500: "Internal Error - Trace ID logged"`
+  timeouts:
+    gateway: 29s (Hard limit)
+    upstream: 5s (Default)
+  
+  caching:
+    public_get: Cache-Control: s-maxage=60, stale-while-revalidate=30
+    private_data: No-Store
+
+request_lifecycle:
+  1_identification: Correlation-ID injection
+  2_sanitization: Strip X-Powered-By, standard headers
+  3_validation: JSON Schema enforcement (Zod)
+  4_routing: Upstream mapping via Service Discovery
+  5_response: Transform errors to RFC 7807 Problem Details`
   },
   {
     id: '5',
@@ -173,53 +184,48 @@ error_handling:
     lastUpdated: new Date().toISOString(),
     version: 4,
     history: [],
-    expertise: `system_architecture:
-  pattern: Microservices
-  orchestration: Kubernetes (EKS)
-  infrastructure_as_code: Terraform
-  ci_cd: GitHub Actions -> ArgoCD
+    expertise: `identity:
+  role: Distributed Systems Engineer
+  philosophy: "Build for failure. Decouple everything. State is the enemy of scale."
 
-technology_stack:
-  primary_language: Node.js (TypeScript)
-  high_performance_language: Go (Golang)
-  frameworks:
-    - NestJS (Standard REST services)
-    - Fastify (High throughput services)
+architectural_patterns:
+  style: Event-Driven Microservices
+  communication:
+    synchronous: gRPC (Internal, high-perf)
+    asynchronous: RabbitMQ (Task distribution) / Kafka (Data streaming)
+  consistency_model: Eventual Consistency (Saga Pattern for distributed tx)
 
-service_boundaries:
-  identity_service:
-    responsibility: Auth, User Profiles
-    datastore: PostgreSQL (Dedicated)
-  
-  billing_service:
-    responsibility: Invoicing, Payment Gateway integration
-    pattern: Event-Driven Consumer
-    queue: SQS FIFO
-  
-  notification_service:
-    responsibility: Email, SMS, Push
-    queue: RabbitMQ (Fanout exchange)
+tech_stack:
+  runtime: Node.js 22 (LTS) / Go 1.22
+  frameworks: 
+    node: NestJS (Structured DDD)
+    go: Echo/Gin
+  orm: Prisma (Typesafe) or raw SQL via Kysely
 
-resiliency_patterns:
-  circuit_breaker:
-    implementation: Opossum
-    threshold: 50% failure rate
-    reset_timeout: 30s
-  
-  retry_policy:
-    strategy: Exponential Backoff
-    max_attempts: 3
-    jitter: true
+concurrency_model:
+  node: Event Loop + Worker Threads for CPU intensive tasks
+  go: Goroutines + Channels
+  distributed_locking: Redlock algorithm (Redis)
 
-caching_strategy:
-  layer_1: Redis (Distributed) - TTL 1 hour
-  layer_2: In-Memory (LRU) - TTL 5 minutes
-  invalidation: Event-based (Cache-aside)
+background_processing:
+  queue_engine: BullMQ (Redis-based)
+  patterns:
+    - "At-least-once delivery"
+    - "Idempotency keys required for all consumers"
+    - "Dead Letter Queues (DLQ) for failed jobs > 3 retries"
+    - "Exponential backoff strategy"
 
 observability:
-  metrics: Prometheus (Golden Signals)
-  tracing: OpenTelemetry (Jaeger)
-  logging: ELK Stack (Structured JSON)`
+  tracing: OpenTelemetry (Auto-instrumentation)
+  metrics: 
+    - RED Method (Rate, Errors, Duration)
+    - USE Method (Utilization, Saturation, Errors) for resources
+  logging: Structured JSON (Pino/Zap) with trace_id
+
+anti_patterns:
+  - "Distributed Monolith (Shared Database)"
+  - "Synchronous coupling chains (Service A -> B -> C -> D)"
+  - "local state for session management"`
   },
   {
     id: '3',
@@ -231,51 +237,54 @@ observability:
     lastUpdated: new Date().toISOString(),
     version: 2,
     history: [],
-    expertise: `connection_protocol:
-  primary: Secure WebSocket (WSS)
-  fallback: Long Polling (HTTP/1.1)
-  handshake: HTTP Upgrade + JWT Validation via Query Param
+    expertise: `identity:
+  role: Realtime Systems Specialist
+  philosophy: "Latency determines reality. Connection state is fluid."
 
-scalability_design:
-  horizontal_scaling:
-    adapter: Redis Pub/Sub (Sharded)
-    load_balancing: Nginx (IP Hash / Sticky Sessions)
-  limits:
-    max_connections_per_node: 10,000
-    heartbeat_interval: 25s
-    connection_timeout: 60s
+protocol_stack:
+  primary: WebSocket (RFC 6455)
+  fallback: Server-Sent Events (SSE) for one-way feeds
+  transport: Socket.io / WS Library
+  compression: Per-message deflate enabled
 
-event_schema:
-  structure:
-    event: string (namespace:action)
-    payload: object
-    meta:
-      timestamp: number
-      message_id: uuid
-  
-  namespaces:
-    chat:
-      - chat:join_room { roomId }
-      - chat:send_message { text, type }
-      - chat:typing { isTyping }
-    
-    system:
-      - system:alert { level, msg }
-      - system:maintenance_scheduled { time }
+infrastructure_scaling:
+  load_balancing:
+    layer_7: Nginx Sticky Sessions (ip_hash or cookie)
+    termination: TLS Offloading at LB
+  pub_sub:
+    engine: Redis Cluster
+    usage: Broadcasting events across horizontal nodes
+    format: MessagePack (Binary) for bandwidth reduction
 
-reliability_mechanisms:
-  message_delivery:
-    qos_level: At-most-once (default)
-    guaranteed_delivery: Acknowledge (ACK) protocol for critical alerts
-  
-  backpressure:
-    strategy: Drop oldest messages if user queue > 100
-    alert_threshold: Queue size > 80
+connection_lifecycle:
+  handshake: 
+    - HTTP Upgrade Request
+    - JWT Validation via Query Param / Cookie
+  heartbeat:
+    - Ping/Pong every 25s
+    - Client disconnect detection logic
+    - "Ghost connection" cleanup script
 
 presence_system:
-  implementation: Redis HyperLogLog & Sets
-  update_frequency: 30s (Heartbeat)
-  offline_threshold: 60s`
+  implementation: Redis Hash + Sets
+  schema: "room:{id}:members -> Set<UserId>"
+  expiry: TTL on keys refreshed by heartbeat
+  events:
+    - user:joined (Debounced)
+    - user:left (Graceful + Unexpected)
+
+reliability_mechanisms:
+  message_queue:
+    - User-specific inbox in Redis List
+    - ACK protocol for 'guaranteed' delivery messages
+  backpressure:
+    - Client-side buffer monitoring
+    - Drop non-critical messages (e.g., 'typing' indicators) under load
+  
+security:
+  - Max payload size: 16KB
+  - Rate limit: 50 messages/sec per socket
+  - Origin check enforcement`
   },
   {
     id: '4',
@@ -287,50 +296,53 @@ presence_system:
     lastUpdated: new Date().toISOString(),
     version: 5,
     history: [],
-    expertise: `engineering_stack:
-  framework: React 19
-  build_tool: Vite
-  language: TypeScript 5.x (Strict Mode)
-  styling: TailwindCSS + Class Variance Authority (CVA)
+    expertise: `identity:
+  role: Client-Side Architect
+  philosophy: "The UI is a function of state. Performance is a feature. Accessibility is a right."
 
-architectural_patterns:
-  structure: Feature-Sliced Design (FSD)
-  routing: File-system based (React Router / TanStack Router)
-  code_splitting: Route-based lazy loading
+framework_ecosystem:
+  core: React 19 (Server Components ready)
+  build: Vite (ESBuild)
+  meta_framework: Next.js / Remix / TanStack Start
+  language: TypeScript 5.4 (Strict Mode, no-explicit-any)
 
-state_management:
-  server_state: 
-    library: TanStack Query (React Query)
-    stale_time: 5 minutes
-    cache_time: 30 minutes
+state_management_matrix:
+  server_cache: TanStack Query (v5)
+    - Stale-while-revalidate
+    - Optimistic updates
+    - Deduping requests
+  global_ui: Zustand / Jotai (Atomic state)
+  url_state: Nuqs (Type-safe search params)
+  form_state: React Hook Form + Valibot (smaller than Zod)
+
+performance_budgeting:
+  metrics:
+    LCP (Largest Contentful Paint): < 2.5s
+    INP (Interaction to Next Paint): < 200ms
+    CLS (Cumulative Layout Shift): < 0.1
+  bundle_analysis:
+    - Route-based code splitting
+    - Tree-shaking verification
+    - Image optimization (AVIF/WebP)
+    - Font subsetting
+
+architecture_patterns:
+  folder_structure: Feature-Sliced Design (FSD) or Screaming Architecture
+  components:
+    - Atomic Design (Atoms, Molecules, Organisms)
+    - Headless UI (Radix / Ark UI) for logic
+    - Tailwind CSS + CVA for styling
   
-  client_state:
-    library: Zustand
-    usage: Global UI settings, Auth tokens
-  
-  form_state:
-    library: React Hook Form
-    validation: Zod Schema Integration
+resiliency:
+  error_handling: Error Boundaries (Granular wrapping)
+  suspense: Streaming HTML with Skeleton fallbacks
+  offline: Service Worker (Workbox) caching strategies
 
-performance_budget:
-  core_web_vitals:
-    LCP: < 2.5s
-    CLS: < 0.1
-    FID: < 100ms
-  bundle_size:
-    entry_point: < 200KB (gzipped)
-    chunks: < 50KB
-
-component_library:
-  philosophy: Atomic Design
-  accessibility: 
-    standard: WCAG 2.1 AA
-    testing: axe-core automated checks
-  
 testing_strategy:
-  unit: Vitest (Logic & Utils)
-  component: React Testing Library
-  e2e: Playwright (Critical user journeys)`
+  unit: Vitest (Business logic, hooks)
+  integration: React Testing Library (User interactions)
+  e2e: Playwright (Critical paths, Visual regression)
+  a11y: axe-core (CI pipeline check)`
   },
   {
     id: '6',
