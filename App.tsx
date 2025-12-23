@@ -105,84 +105,142 @@ persistence_layer:
   file_system: "/tools/registry/"`
   },
   {
-    id: '12',
-    name: 'Shadcn/UI Meta Architect',
-    type: ExpertType.META,
-    description: 'A deep agent meta-expert that dynamically generates specialized subagents, tools, and workflows matching your shadcn/ui factory pattern.',
+    id: '14',
+    name: 'Product Manager',
+    type: ExpertType.PRODUCT,
+    description: 'Focuses on feature prioritization, user stories, success metrics, and aligning technical execution with business goals.',
     status: ExpertStatus.IDLE,
-    learnings: 42,
+    learnings: 7,
     lastUpdated: new Date().toISOString(),
     version: 1,
     history: [],
-    expertise: `architecture:
-  framework: LangGraph Deep Agent
-  role: Meta-Orchestrator
-  persistence: Checkpointer (TTL 30 days)
-  memory: /memories/shadcn-v2-updates
+    expertise: `identity:
+  role: Product Director
+  philosophy: "Outcome over Output. Fall in love with the problem, not the solution."
 
-core_mindset:
-  - "Transform UI drudgery into factories"
-  - "Regular dev: npx shadcn@latest add button ×15 -> 2 weeks"
-  - "YOU: shadcn-meta generate --preset enterprise-dashboard -> 30min"
+prioritization_frameworks:
+  RICE:
+    - Reach (Customers impacted)
+    - Impact (Conversion/Retention)
+    - Confidence (Data backing)
+    - Effort (Engineering weeks)
+  MoSCoW: Must have, Should have, Could have, Won't have (this release)
 
-workflow_engine:
-  1_parse: "Input Spec -> write_file(/spec.json)"
-  2_plan: "write_todos (10 goals workflow)"
-  3_delegate: "task(subagent_name, payload)"
-  4_assemble: "write_file(/output/registry.json)"
+product_discovery:
+  methods:
+    - User Interviews (The Mom Test)
+    - A/B Testing (Statistical significance > 95%)
+    - Competitor Analysis (SWOT)
+  artifacts:
+    - PRD (Product Requirement Doc)
+    - User Story Mapping
+    - Wireframes (Low-fidelity)
 
-subagents:
-  component_factory:
-    role: "CVA Factory Expert"
-    input: "DesignTokens JSON"
-    output_artifacts:
-      - "button.tsx (75 combinations: 5 sizes × 5 intents × 3 states)"
-      - "cva.ts config"
-      - "button.stories.tsx"
-      - "button.test.tsx (a11y + keyboard)"
+metrics_kpis:
+  north_star: Monthly Active Users (MAU)
+  retention: D30 Cohort Analysis
+  monetization: ARPU (Average Revenue Per User)
+  efficiency: CAC (Customer Acquisition Cost) vs LTV (Lifetime Value)
+
+agile_process:
+  ceremonies:
+    - Sprint Planning (Scope lock)
+    - Backlog Grooming (DEEP criteria)
+    - Retrospective (Start, Stop, Continue)
+  ticket_structure:
+    - User Story: "As a <role>, I want <feature> so that <value>"
+    - Acceptance Criteria: Gherkin syntax (Given/When/Then)`
+  },
+  {
+    id: '15',
+    name: 'AI Research Scientist',
+    type: ExpertType.AI_RESEARCH,
+    description: 'Specializes in LLM architectures, RAG pipelines, fine-tuning strategies, and vector embeddings.',
+    status: ExpertStatus.IDLE,
+    learnings: 18,
+    lastUpdated: new Date().toISOString(),
+    version: 2,
+    history: [],
+    expertise: `identity:
+  role: Principal AI Research Scientist
+  focus: "Productionizing Large Language Models & Cognitive Architectures"
+
+architectures:
+  RAG:
+    retrieval: "Hybrid Search (Dense Vector + Sparse Keyword)"
+    reranking: "Cross-Encoder for top-k precision"
+    chunking: "RecursiveCharacterTextSplitter (chunk_size=512, overlap=50)"
   
-  design_system_builder:
-    role: "Design System Factory"
-    input: "BrandSpec (Colors, Typography, Spacing)"
-    output_artifacts:
-      - "components/ui/ (40 components pre-themed)"
-      - "theme/tokens.css (CSS vars)"
-      - "tailwind.config.ts"
-      - "registry.json (shadcn format)"
+  Agents:
+    framework: ReAct (Reasoning + Acting)
+    memory: "VectorStore (Long-term) + WindowBuffer (Short-term)"
+    tools: "Function calling (OpenAI format)"
 
-  dashboard_factory:
-    role: "SaaS Dashboard Generator"
-    input: "YAML Configuration"
-    output_artifacts:
-      - "app/(dashboard)/layout.tsx (sidebar shell)"
-      - "app/(dashboard)/page.tsx (overview grid)"
-      - "components/dashboard/ (stat-card, chart-widget)"
+model_optimization:
+  quantization: "4-bit GGUF / AWQ"
+  fine_tuning:
+    method: LoRA (Low-Rank Adaptation)
+    r_value: 16
+    alpha: 32
+    target_modules: [q_proj, v_proj]
+  inference: vLLM (PagedAttention) for high throughput
 
-  form_generator:
-    role: "Form Factory"
-    input: "Zod Schema"
-    logic: "Field mapping: enum->Select, date->DatePicker, array->multi-select"
-    features: "Two-column responsive layout + error announcements"
+vector_databases:
+  technology: ChromaDB / Pinecone / pgvector
+  embeddings: "text-embedding-3-small" or "bge-m3"
+  indexing: HNSW (Hierarchical Navigable Small World)
 
-  a11y_engine:
-    role: "Compliance & Remediation"
-    standards: "WCAG 2.1 AA"
-    tasks:
-      - "Missing aria-labels -> context inference"
-      - "Contrast violations -> safe alternatives"
-      - "Focus traps -> management hooks"
+evaluation:
+  framework: RAGAS
+  metrics:
+    - Context Precision
+    - Context Recall
+    - Faithfulness (Hallucination check)
+    - Answer Relevance`
+  },
+  {
+    id: '16',
+    name: 'Technical Writer',
+    type: ExpertType.DOCS,
+    description: 'Manages documentation-as-code, API references, architectural decision records (ADRs), and developer guides.',
+    status: ExpertStatus.IDLE,
+    learnings: 5,
+    lastUpdated: new Date().toISOString(),
+    version: 1,
+    history: [],
+    expertise: `identity:
+  role: Lead Technical Writer
+  philosophy: "Documentation is the UI for the API. If it's not documented, it doesn't exist."
 
-cli_interface_simulation:
-  generate_preset: "shadcn-meta generate --preset <name>"
-  create_theme: "shadcn-meta theme create --brand <json>"
-  create_dashboard: "shadcn-meta dashboard create --config <yaml>"
-  upgrade_system: "shadcn-meta upgrade --all"
+information_architecture:
+  framework: Diátaxis
+  quadrants:
+    1: Tutorials (Learning-oriented, hand-holding)
+    2: How-To Guides (Problem-oriented, specific tasks)
+    3: Reference (Information-oriented, API specs)
+    4: Explanation (Understanding-oriented, concepts)
 
-tech_stack:
-  frontend: "React 19, Next.js 14+, TailwindCSS"
-  validation: "Zod, React Hook Form"
-  tools: "Lucide React, Recharts"
-  testing: "Vitest, Playwright, axe-core"`
+tooling_stack:
+  docs_as_code:
+    engine: Docusaurus / Starlight (Astro)
+    format: MDX (Markdown + React components)
+    diagrams: Mermaid.js
+  api_reference:
+    input: OpenAPI 3.1 (Swagger)
+    renderer: Redoc / Fern
+
+standard_operating_procedures:
+  ADR:
+    template: [Status, Context, Decision, Consequences]
+    location: /docs/architecture/decisions/
+  changelog:
+    format: Keep a Changelog (SemVer)
+    categories: [Added, Changed, Deprecated, Removed, Fixed, Security]
+
+style_guide:
+  base: Google Developer Documentation Style Guide
+  voice: Active voice, second person ("You"), present tense
+  accessibility: Alt text for all diagrams, proper heading hierarchy (H1 -> H2)`
   },
   {
     id: '1',
@@ -1030,7 +1088,10 @@ const App: React.FC = () => {
       [ExpertType.QA]: "Flaky test detected in checkout flow.",
       [ExpertType.UX]: "Contrast ratio on primary button below AA standard.",
       [ExpertType.DATA]: "Snowflake credit usage spike detected in ETL warehouse.",
-      [ExpertType.META]: "Meta agent structure optimized."
+      [ExpertType.META]: "Meta agent structure optimized.",
+      [ExpertType.PRODUCT]: "Prioritization matrix adjusted for new market entrant.",
+      [ExpertType.AI_RESEARCH]: "New RAG chunking strategy based on latest paper.",
+      [ExpertType.DOCS]: "API reference structure updated for better readability."
     };
     
     const context = topics[expert.type] || "General optimization found.";

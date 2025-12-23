@@ -1,6 +1,6 @@
 import React from 'react';
 import { Expert, ExpertStatus, ExpertType } from '../types';
-import { Database, Server, Wifi, Layout, Brain, Activity, Eye, Zap, MessageSquare, Upload, Users, Cpu, Network, Cloud, ShieldCheck, Smartphone, TestTube, Palette, BarChart3 } from 'lucide-react';
+import { Database, Server, Wifi, Layout, Brain, Activity, Eye, Zap, MessageSquare, Upload, Users, Cpu, Network, Cloud, ShieldCheck, Smartphone, TestTube, Palette, BarChart3, Briefcase, FileText, Binary } from 'lucide-react';
 
 interface ExpertCardProps {
   expert: Expert;
@@ -25,6 +25,9 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
       case ExpertType.QA: return <TestTube className="w-6 h-6" />;
       case ExpertType.UX: return <Palette className="w-6 h-6" />;
       case ExpertType.DATA: return <BarChart3 className="w-6 h-6" />;
+      case ExpertType.PRODUCT: return <Briefcase className="w-6 h-6" />;
+      case ExpertType.AI_RESEARCH: return <Binary className="w-6 h-6" />;
+      case ExpertType.DOCS: return <FileText className="w-6 h-6" />;
       default: return <Brain className="w-6 h-6" />;
     }
   };

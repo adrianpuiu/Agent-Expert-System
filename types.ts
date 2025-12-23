@@ -11,7 +11,10 @@ export enum ExpertType {
   QA = 'QA',
   UX = 'UX',
   DATA = 'Data',
-  META = 'Meta'
+  META = 'Meta',
+  PRODUCT = 'Product',
+  AI_RESEARCH = 'AI Research',
+  DOCS = 'Docs'
 }
 
 export enum ExpertStatus {

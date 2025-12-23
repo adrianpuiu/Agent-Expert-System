@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Bot, Loader2, Save, ArrowRight, ArrowLeft, Database, Server, Wifi, Layout, Brain, CheckCircle2, Cpu, Cloud, ShieldCheck, Smartphone, TestTube, Palette, BarChart3 } from 'lucide-react';
+import { X, Sparkles, Bot, Loader2, Save, ArrowRight, ArrowLeft, Database, Server, Wifi, Layout, Brain, CheckCircle2, Cpu, Cloud, ShieldCheck, Smartphone, TestTube, Palette, BarChart3, Briefcase, FileText, Binary } from 'lucide-react';
 import { ExpertType } from '../types';
 import { generateMetaContent } from '../services/geminiService';
 
@@ -82,6 +82,9 @@ Ensure the structure reflects domain-specific knowledge (e.g., schemas for Datab
       case ExpertType.UX: return <Palette className="w-5 h-5" />;
       case ExpertType.DATA: return <BarChart3 className="w-5 h-5" />;
       case ExpertType.META: return <Brain className="w-5 h-5" />;
+      case ExpertType.PRODUCT: return <Briefcase className="w-5 h-5" />;
+      case ExpertType.AI_RESEARCH: return <Binary className="w-5 h-5" />;
+      case ExpertType.DOCS: return <FileText className="w-5 h-5" />;
       default: return <Bot className="w-5 h-5" />;
     }
   };
