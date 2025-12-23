@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, RotateCcw, Copy, Check, FileText, GitCommit, FileDiff, ArrowRight, History, Clock, Workflow, Loader2, Maximize2, Sparkles } from 'lucide-react';
 import { Expert, ExpertiseHistory } from '../types';
-import { generateMermaidDiagram } from '../services/geminiService';
-import MermaidDiagram from './MermaidDiagram';
+import { generateGraphData } from '../services/geminiService';
+import D3Diagram from './D3Diagram';
 
 interface ExpertiseModalProps {
   isOpen: boolean;
@@ -46,21 +46,21 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
   const [viewMode, setViewMode] = useState<'code' | 'diff' | 'visual'>('code');
   const [copied, setCopied] = useState(false);
   
-  // Diagram State
-  const [diagramCode, setDiagramCode] = useState<string | null>(null);
-  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
-  const diagramCache = useRef<Record<string, string>>({});
+  // Graph State
+  const [graphData, setGraphData] = useState<{ nodes: any[], links: any[] } | null>(null);
+  const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
+  const graphCache = useRef<Record<string, { nodes: any[], links: any[] }>>({});
 
   // Reset selected version when modal opens/expert changes
   useEffect(() => {
     if (isOpen) {
       setSelectedVersion(expert.version);
       setViewMode('code');
-      setDiagramCode(null);
+      setGraphData(null);
     }
   }, [isOpen, expert]);
 
-  // Handle Diagram Generation when tab is switched or version changes
+  // Handle Graph Generation when tab is switched or version changes
   useEffect(() => {
     if (viewMode === 'visual' && selectedVersion !== null) {
       const selectedContent = fullHistory.find(h => h.version === selectedVersion)?.content;
@@ -68,17 +68,19 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
 
       const cacheKey = `${expert.id}-v${selectedVersion}`;
       
-      if (diagramCache.current[cacheKey]) {
-        setDiagramCode(diagramCache.current[cacheKey]);
+      if (graphCache.current[cacheKey]) {
+        setGraphData(graphCache.current[cacheKey]);
       } else {
-        setIsGeneratingDiagram(true);
-        generateMermaidDiagram(selectedContent, expert.type)
-          .then(code => {
-            diagramCache.current[cacheKey] = code;
-            setDiagramCode(code);
+        setIsGeneratingGraph(true);
+        generateGraphData(selectedContent, expert.type)
+          .then(data => {
+            if (data) {
+                graphCache.current[cacheKey] = data;
+                setGraphData(data);
+            }
           })
           .catch(err => console.error(err))
-          .finally(() => setIsGeneratingDiagram(false));
+          .finally(() => setIsGeneratingGraph(false));
       }
     }
   }, [viewMode, selectedVersion, expert.id]);
@@ -362,22 +364,7 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
               )}
               {viewMode === 'visual' && (
                 <div className="w-full h-full flex flex-col">
-                  {isGeneratingDiagram ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 rounded-full animate-pulse" />
-                        <Loader2 className="w-8 h-8 animate-spin text-indigo-500 relative z-10" />
-                      </div>
-                      <p className="text-sm font-medium">Generating Visual Mental Model...</p>
-                      <p className="text-xs opacity-70">Converting YAML to Architecture Diagram</p>
-                    </div>
-                  ) : diagramCode ? (
-                    <MermaidDiagram code={diagramCode} />
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center text-gray-400">
-                      <p>Unable to generate diagram.</p>
-                    </div>
-                  )}
+                   <D3Diagram data={graphData} isLoading={isGeneratingGraph} />
                 </div>
               )}
             </div>
@@ -393,11 +380,11 @@ const ExpertiseModal: React.FC<ExpertiseModalProps> = ({ isOpen, onClose, expert
                )}
                {viewMode === 'visual' && (
                  <span className="flex items-center gap-1.5 text-indigo-600 font-medium">
-                   <Sparkles className="w-3 h-3" /> AI Generated Diagram
+                   <Sparkles className="w-3 h-3" /> AI Generated Graph (D3.js)
                  </span>
                )}
              </div>
-             <span className="font-mono">{viewMode === 'visual' ? 'MERMAID.JS' : 'YAML'}</span>
+             <span className="font-mono">{viewMode === 'visual' ? 'D3.JS GRAPH' : 'YAML'}</span>
           </div>
         </div>
       </div>

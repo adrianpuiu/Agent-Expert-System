@@ -407,10 +407,10 @@ export const generateMetaContent = async (
   }
 };
 
-export const generateMermaidDiagram = async (
+export const generateGraphData = async (
   expertiseYaml: string,
   expertType: string
-): Promise<string> => {
+): Promise<{ nodes: any[], links: any[] } | null> => {
   try {
     const ai = getAiClient();
     const model = 'gemini-3-flash-preview';
@@ -422,14 +422,14 @@ export const generateMermaidDiagram = async (
       ${expertiseYaml}
       \`\`\`
 
-      Task: Generate a Mermaid.js diagram code to visualize this mental model.
-
-      Requirements:
-      1. Use valid Mermaid.js syntax.
-      2. Choose the most appropriate diagram type (e.g., erDiagram for databases, graph TD for architecture).
-      3. Use clear, concise labels.
-      4. Escape any special characters in labels using double quotes if necessary.
-      5. Return the result in JSON format with a "mermaidCode" property containing the raw string.
+      Task: Create a network graph representation of this mental model.
+      1. Identify key concepts, technologies, or rules as "nodes".
+      2. Identify relationships between them as "links".
+      3. Return a clean JSON object with two arrays: "nodes" and "links".
+      4. Node format: { "id": "ConceptName", "group": 1 (for main categories) or 2 (for details) }
+      5. Link format: { "source": "ConceptName", "target": "RelatedConcept" }
+      
+      IMPORTANT: Ensure 'source' and 'target' in links exactly match the 'id' of nodes.
     `;
 
     const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -441,42 +441,25 @@ export const generateMermaidDiagram = async (
     }));
 
     let jsonText = response.text;
-    if(!jsonText) return "graph TD\nError[No response from AI]";
+    if(!jsonText) return null;
 
     // Clean up potential markdown formatting from JSON response
     jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
     
     try {
       const result = JSON.parse(jsonText);
-      return result.mermaidCode || "graph TD\nError[Invalid JSON response structure]";
-    } catch (e) {
-      console.error("JSON Parse Error for Diagram:", e);
-      // Fallback: try to extract mermaid code if strictly not JSON
-      if (jsonText.includes("graph ") || jsonText.includes("erDiagram")) {
-        return jsonText;
+      if (result.nodes && result.links) {
+        return result;
       }
-      return "graph TD\nError[Failed to parse diagram JSON]";
+      return null;
+    } catch (e) {
+      console.error("JSON Parse Error for Graph:", e);
+      return null;
     }
     
   } catch (error: any) {
-    console.error("Diagram Generation Error:", error);
-    
-    // Friendly error for Rate Limiting - Enhanced Check
-    const isRateLimit = 
-      error?.status === 429 || 
-      error?.code === 429 || 
-      error?.error?.code === 429 || 
-      error?.status === 'RESOURCE_EXHAUSTED' ||
-      error?.error?.status === 'RESOURCE_EXHAUSTED' ||
-      error?.message?.includes('429') || 
-      error?.message?.includes('quota') || 
-      error?.message?.includes('RESOURCE_EXHAUSTED');
-
-    if (isRateLimit) {
-       return `graph TD\nError[API Rate Limit Exceeded]\nstyle Error fill:#ffaaaa,stroke:#ff0000,stroke-width:2px`;
-    }
-
-    return "graph TD\nError[Failed to generate diagram]";
+    console.error("Graph Generation Error:", error);
+    return null;
   }
 };
 
