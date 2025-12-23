@@ -425,6 +425,172 @@ incident_response:
   playbooks:
     - ransomware_containment
     - leaked_credential_rotation`
+  },
+  {
+    id: '8',
+    name: 'Mobile Engineer',
+    type: ExpertType.MOBILE,
+    description: 'Specializes in cross-platform mobile development, native modules bridging, and offline-first architectures.',
+    status: ExpertStatus.IDLE,
+    learnings: 6,
+    lastUpdated: new Date().toISOString(),
+    version: 2,
+    history: [],
+    expertise: `core_stack:
+  framework: React Native 0.76 (New Architecture enabled)
+  toolchain: Expo SDK 51
+  languages: TypeScript, Kotlin (Android), Swift (iOS)
+
+state_management:
+  local_state: Legend-State (High performance observables)
+  global_store: Zustand
+  persistence: MMKV (Fast sync storage)
+
+navigation_structure:
+  library: Expo Router v3
+  pattern: File-system based
+  deep_linking:
+    scheme: "myapp://"
+    universal_links: Enabled (Apple App Site Association)
+
+offline_first_strategy:
+  database: WatermelonDB (SQLite wrapper)
+  sync_engine: Custom queue with exponential backoff
+  conflict_resolution: Last-Write-Wins (Client)
+
+native_integrations:
+  camera: VisionCamera (High FPS frame processing)
+  biometrics: Expo Local Authentication
+  maps: React Native Maps (Google Maps / Apple Maps)
+
+release_pipeline:
+  ota_updates: EAS Update (Critical hotfixes only)
+  store_deployment: EAS Build -> TestFlight / Play Console
+  versioning: Semantic (major.minor.patch)`
+  },
+  {
+    id: '9',
+    name: 'QA Automation Lead',
+    type: ExpertType.QA,
+    description: 'Ensures software quality through comprehensive automated testing strategies, visual regression, and CI gates.',
+    status: ExpertStatus.IDLE,
+    learnings: 9,
+    lastUpdated: new Date().toISOString(),
+    version: 3,
+    history: [],
+    expertise: `testing_pyramid:
+  e2e: Playwright (Critical user journeys only)
+  integration: Vitest (Service interactions)
+  unit: Jest (Business logic isolation)
+  static_analysis: Biome + TypeScript Strict
+
+framework_config:
+  playwright:
+    browsers: [Chromium, Webkit, Firefox]
+    parallel_workers: 4
+    retries: 2 (CI only)
+    trace_viewer: On-failure
+
+design_patterns:
+  pom: Page Object Model (Encapsulate DOM interactions)
+  fixtures: Custom test fixtures for Auth/Database state
+  data_generation: Faker.js (Deterministic seeds)
+
+visual_regression:
+  tool: Chromatic (Storybook integration)
+  threshold: 0.1% pixel difference
+  baselines: Master branch only
+
+pipeline_integration:
+  pre_commit: Husky (Lint-staged + Unit tests)
+  pr_checks:
+    - Build validation
+    - Integration suite
+    - E2E Smoke tests (5 mins max)
+  nightly: Full E2E Regression suite`
+  },
+  {
+    id: '10',
+    name: 'UX/UI Designer',
+    type: ExpertType.UX,
+    description: 'Architects the design system, enforces accessibility standards, and optimizes user interaction flows.',
+    status: ExpertStatus.ACTIVE,
+    learnings: 14,
+    lastUpdated: new Date().toISOString(),
+    version: 4,
+    history: [],
+    expertise: `design_system:
+  foundation: Atomic Design
+  tokens:
+    primitives: color, spacing, typography, radius
+    semantic: action-primary, surface-danger, text-subtle
+    component: btn-bg-hover, card-border
+  tooling: Figma Variables + Tokens Studio
+
+accessibility_standards:
+  compliance: WCAG 2.2 Level AA
+  requirements:
+    contrast_ratio: 4.5:1 (Normal text)
+    focus_states: Visible outline (2px)
+    screen_readers: Semantic HTML structure + ARIA labels
+
+user_experience_heuristics:
+  - "Match between system and real world"
+  - "User control and freedom (Undo/Redo)"
+  - "Consistency and standards"
+  - "Error prevention over error recovery"
+
+interaction_patterns:
+  feedback: Immediate (<100ms) visual response to input
+  loading_states: Skeleton screens (perceived performance)
+  motion: Reduced Motion support (prefers-reduced-motion)
+
+handonff_process:
+  format: Figma Dev Mode
+  assets: SVG Symbols
+  documentation: Storybook (Live component playground)`
+  },
+  {
+    id: '11',
+    name: 'Data Engineer',
+    type: ExpertType.DATA,
+    description: 'Builds scalable ETL pipelines, manages data warehouses, and enables advanced analytics.',
+    status: ExpertStatus.IDLE,
+    learnings: 3,
+    lastUpdated: new Date().toISOString(),
+    version: 1,
+    history: [],
+    expertise: `data_warehouse:
+  platform: Snowflake
+  architecture: Medallion (Bronze -> Silver -> Gold)
+  storage_format: Apache Parquet / Iceberg
+
+etl_pipelines:
+  orchestration: Airflow
+  transformation: dbt (Data Build Tool)
+  ingestion:
+    batch: Fivetran (Daily syncs)
+    streaming: Kafka Connect -> Snowpipe
+
+data_quality:
+  framework: Great Expectations
+  checks:
+    - null_values
+    - unique_keys
+    - referential_integrity
+    - volume_anomaly_detection
+
+governance:
+  catalog: DataHub
+  lineage: Column-level tracing
+  access_control:
+    - PII masking policies
+    - Row-level security for multi-tenant data
+
+analytics_stack:
+  bi_tool: Looker / Tableau
+  semantic_layer: Cube.js
+  metrics_definition: Code-based (YAML)`
   }
 ];
 
@@ -700,6 +866,10 @@ const App: React.FC = () => {
       [ExpertType.FRONTEND]: "Button component deprecated 'ghost' variant in favor of 'text'.",
       [ExpertType.DEVOPS]: "Kubernetes pod autoscaler flapping detected.",
       [ExpertType.SECURITY]: "New CVE discovered in OpenSSL dependency.",
+      [ExpertType.MOBILE]: "New iOS 18 privacy manifest requirement.",
+      [ExpertType.QA]: "Flaky test detected in checkout flow.",
+      [ExpertType.UX]: "Contrast ratio on primary button below AA standard.",
+      [ExpertType.DATA]: "Snowflake credit usage spike detected in ETL warehouse.",
       [ExpertType.META]: "Meta agent structure optimized."
     };
     

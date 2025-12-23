@@ -7,6 +7,10 @@ export enum ExpertType {
   BACKEND = 'Backend',
   DEVOPS = 'DevOps',
   SECURITY = 'Security',
+  MOBILE = 'Mobile',
+  QA = 'QA',
+  UX = 'UX',
+  DATA = 'Data',
   META = 'Meta'
 }
 
