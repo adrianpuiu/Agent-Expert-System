@@ -459,6 +459,31 @@ export const generateGraphData = async (
     
   } catch (error: any) {
     console.error("Graph Generation Error:", error);
+    
+    // Graceful Handling for Quota/Rate Limit Errors
+    const isRateLimit = 
+      error?.status === 429 || 
+      error?.code === 429 || 
+      error?.error?.code === 429 || 
+      error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.message?.includes('429') || 
+      error?.message?.includes('quota') || 
+      error?.message?.includes('RESOURCE_EXHAUSTED');
+
+    if (isRateLimit) {
+      // Return a special error node to display in D3 instead of crashing/blank
+      return {
+        nodes: [
+          { id: "API Quota Exceeded", group: 1 },
+          { id: "Please try again later", group: 2 }
+        ],
+        links: [
+          { source: "API Quota Exceeded", target: "Please try again later" }
+        ]
+      };
+    }
+
     return null;
   }
 };

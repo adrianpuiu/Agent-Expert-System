@@ -1490,13 +1490,13 @@ const App: React.FC = () => {
       <WarRoomModal 
         isOpen={isWarRoomOpen} 
         onClose={() => setIsWarRoomOpen(false)}
-        experts={experts.filter(e => e.status !== ExpertStatus.IDLE)} 
+        experts={experts} 
       />
 
       <VoiceCallModal 
         isOpen={isVoiceCallOpen}
         onClose={() => setIsVoiceCallOpen(false)}
-        experts={experts.filter(e => e.status !== ExpertStatus.IDLE)}
+        experts={experts}
       />
 
     </div>
