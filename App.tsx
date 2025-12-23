@@ -12,7 +12,8 @@ import {
   Zap,
   Users,
   Plus,
-  Bot
+  Bot,
+  Network
 } from 'lucide-react';
 import ExpertCard from './components/ExpertCard';
 import ExpertiseModal from './components/ExpertiseModal';
@@ -518,6 +519,36 @@ const App: React.FC = () => {
             The difference between a generic agent and an agent expert is simple. One executes and forgets, the other executes and learns.
           </p>
         </div>
+
+        {/* Active Collaboration Indicator */}
+        {experts.some(e => e.status === ExpertStatus.COLLABORATING) && (
+          <div className="mb-8 w-full bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl shadow-lg shadow-indigo-200 p-1 overflow-hidden animate-in slide-in-from-top-4 duration-500">
+             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-lg animate-pulse ring-1 ring-white/30">
+                    <Network className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                       <h3 className="font-bold text-white text-lg">Active Neural Link</h3>
+                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/20 text-white uppercase tracking-wider">
+                         Real-time
+                       </span>
+                    </div>
+                    <p className="text-indigo-100 text-sm mt-0.5">
+                      {experts.filter(e => e.status === ExpertStatus.COLLABORATING).map(e => e.name).join(' and ')} are actively collaborating to solve a complex task.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-1.5 mr-4">
+                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
+                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
+                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
+                </div>
+             </div>
+          </div>
+        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
