@@ -335,11 +335,6 @@ export const generateMermaidDiagram = async (
     const ai = getAiClient();
     const model = 'gemini-3-flash-preview';
 
-    const systemInstruction = `
-      You are a Data Visualization Expert specializing in Mermaid.js.
-      Your task is to convert text-based mental models (YAML) into clear, syntactically correct Mermaid diagrams.
-    `;
-
     const prompt = `
       Expert Domain: ${expertType}
       Mental Model (YAML):
@@ -347,28 +342,30 @@ export const generateMermaidDiagram = async (
       ${expertiseYaml}
       \`\`\`
 
-      Instructions:
-      1. Analyze the YAML structure.
-      2. Choose the best Mermaid diagram type for this domain:
-         - DATABASE: Use 'erDiagram' to show entities and relationships.
-         - API/BACKEND/WEBSOCKET: Use 'sequenceDiagram' for flows or 'graph TD' for architecture/state.
-         - FRONTEND: Use 'graph TD' or 'classDiagram' for component hierarchy.
-         - GENERAL: Use 'mindmap' or 'graph LR'.
-      3. Generate the Mermaid code.
-      4. IMPORTANT: Return ONLY the raw Mermaid code. Do not wrap in markdown backticks. Do not add explanations.
-      5. Ensure labels are concise.
+      Task: Generate a Mermaid.js diagram code to visualize this mental model.
+
+      Requirements:
+      1. Use valid Mermaid.js syntax.
+      2. Choose the most appropriate diagram type (e.g., erDiagram for databases, graph TD for architecture).
+      3. Use clear, concise labels.
+      4. Escape any special characters in labels using double quotes if necessary.
+      5. Return the result in JSON format with a "mermaidCode" property containing the raw string.
     `;
 
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
-      config: { systemInstruction }
+      config: { 
+        responseMimeType: "application/json" 
+      }
     });
 
-    let code = response.text?.trim() || "";
-    code = code.replace(/^```mermaid/, '').replace(/^```/, '').replace(/```$/, '');
+    const jsonText = response.text;
+    if(!jsonText) return "graph TD\nError[No response from AI]";
     
-    return code;
+    const result = JSON.parse(jsonText);
+    return result.mermaidCode || "graph TD\nError[Invalid JSON response]";
+    
   } catch (error) {
     console.error("Diagram Generation Error:", error);
     return "graph TD\nError[Failed to generate diagram]";

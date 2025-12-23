@@ -22,29 +22,39 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code }) => {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
     const renderDiagram = async () => {
       if (!code || !containerRef.current) return;
       
-      setError(null);
+      if (mounted) {
+        setError(null);
+        setSvg(''); 
+      }
       
       try {
         // Unique ID for this render to avoid conflicts
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
         
-        // Attempt to parse first to catch syntax errors before rendering
-        await mermaid.parse(code);
-        
+        // mermaid.render returns { svg } in v10
         const { svg } = await mermaid.render(id, code);
-        setSvg(svg);
-      } catch (err) {
+        
+        if (mounted) {
+          setSvg(svg);
+        }
+      } catch (err: any) {
         console.error("Mermaid Render Error:", err);
-        setError("Failed to render diagram. The syntax generated might be invalid.");
-        // Fallback for visual feedback
-        setSvg(''); 
+        if (mounted) {
+          setError(err.message || "Failed to render diagram syntax.");
+        }
       }
     };
 
     renderDiagram();
+
+    return () => {
+      mounted = false;
+    };
   }, [code]);
 
   if (error) {
