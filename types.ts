@@ -63,6 +63,7 @@ export interface Expert {
   version: number;
   history: ExpertiseHistory[];
   collaboratingWith?: string;
+  collaborationTopic?: string;
 }
 
 export interface LogEntry {

@@ -26,7 +26,7 @@ const WarRoomModal: React.FC<WarRoomModalProps> = ({ isOpen, onClose, experts })
 
   // Debate Loop
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: any;
 
     const runTurn = async () => {
       if (!isDebating || isConsensusReached || turnCount >= maxTurns) {

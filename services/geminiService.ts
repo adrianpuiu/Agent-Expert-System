@@ -1,4 +1,4 @@
-import { GoogleGenAI, FunctionDeclaration, Type, Tool } from "@google/genai";
+import { GoogleGenAI, FunctionDeclaration, Type, Tool, GenerateContentResponse } from "@google/genai";
 import { Expert, WarRoomMessage, SearchSource } from '../types';
 
 const getAiClient = () => {
@@ -17,6 +17,23 @@ interface ChatResponse {
   };
   sources?: SearchSource[];
 }
+
+// Helper for exponential backoff retry on 429 errors
+const withRetry = async <T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error: any) {
+    // Check for rate limit error (status 429 or code 429 or RESOURCE_EXHAUSTED)
+    const isRateLimit = error?.status === 429 || error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota');
+    
+    if (isRateLimit && retries > 0) {
+      console.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(operation, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+};
 
 // Helper to extract sources from grounding metadata
 const extractSources = (response: any): SearchSource[] => {
@@ -99,14 +116,14 @@ export const chatWithExpert = async (
     `;
 
     // 2. First Pass: Generate with Tools
-    const firstResponse = await ai.models.generateContent({
+    const firstResponse = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
       contents: conversationContext,
       config: { 
         systemInstruction,
         tools: tools
       }
-    });
+    }));
 
     // 3. Check for Function Call (Collaboration)
     const functionCalls = firstResponse.functionCalls;
@@ -144,14 +161,14 @@ export const chatWithExpert = async (
             Using this new shared knowledge combined with your own, provide a comprehensive answer to the user.
           `;
 
-          const secondResponse = await ai.models.generateContent({
+          const secondResponse = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
             model,
             contents: collaborationPrompt,
             config: { 
               systemInstruction, // Maintain persona
               tools: [{ googleSearch: {} }] // Keep search enabled for the synthesis
             }
-          });
+          }));
 
           return {
             text: secondResponse.text || "Collaboration completed but no response text generated.",
@@ -209,14 +226,14 @@ export const selfImproveExpert = async (
       If nothing new was learned, return the original YAML and a summary stating "No significant changes."
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         tools: [{ googleSearch: {} }] // Enable search for learning
       }
-    });
+    }));
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response from AI");
@@ -266,13 +283,13 @@ export const trainExpert = async (
          - "summary": A very brief summary of what was ingested (e.g. "Ingested User schema" or "Added Auth API endpoints").
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
       contents: prompt,
       config: {
         responseMimeType: "application/json"
       }
-    });
+    }));
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response from AI");
@@ -315,11 +332,11 @@ export const generateMetaContent = async (
         break;
     }
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
       contents: prompt,
       config: { systemInstruction }
-    });
+    }));
 
     return response.text || "Failed to generate content.";
   } catch (error) {
@@ -353,13 +370,13 @@ export const generateMermaidDiagram = async (
       5. Return the result in JSON format with a "mermaidCode" property containing the raw string.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
       contents: prompt,
       config: { 
         responseMimeType: "application/json" 
       }
-    });
+    }));
 
     let jsonText = response.text;
     if(!jsonText) return "graph TD\nError[No response from AI]";
@@ -379,8 +396,14 @@ export const generateMermaidDiagram = async (
       return "graph TD\nError[Failed to parse diagram JSON]";
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error("Diagram Generation Error:", error);
+    
+    // Friendly error for Rate Limiting
+    if (error?.status === 429 || error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota')) {
+       return `graph TD\nError[API Rate Limit Exceeded]\nstyle Error fill:#ffaaaa,stroke:#ff0000,stroke-width:2px`;
+    }
+
     return "graph TD\nError[Failed to generate diagram]";
   }
 };
@@ -441,14 +464,14 @@ export const getWarRoomTurn = async (
       }
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
       contents: prompt,
       config: {
         systemInstruction,
         responseMimeType: "application/json"
       }
-    });
+    }));
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("No response");

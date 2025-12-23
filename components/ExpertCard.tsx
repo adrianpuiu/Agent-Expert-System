@@ -77,6 +77,14 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
         </div>
 
         <p className="text-sm text-gray-600 mb-6 min-h-[40px]">{expert.description}</p>
+        
+        {/* Dynamic Topic Indicator for Collaborating Experts */}
+        {isCollaborating && expert.collaborationTopic && (
+           <div className="mb-4 -mt-2 bg-indigo-50/80 border border-indigo-100 rounded-lg p-2 text-xs text-indigo-800 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1">
+              <MessageSquare className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-2 italic opacity-90">{expert.collaborationTopic}</span>
+           </div>
+        )}
 
         <div className="flex items-center gap-4 text-xs text-gray-500 mb-6">
           <div className="flex items-center gap-1">

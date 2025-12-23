@@ -527,10 +527,10 @@ const App: React.FC = () => {
             const handleCollaborationStart = (partnerName: string, reason: string) => {
                setExperts(prevExperts => prevExperts.map(e => {
                   if (e.id === expert.id) {
-                     return { ...e, status: ExpertStatus.COLLABORATING, collaboratingWith: partnerName };
+                     return { ...e, status: ExpertStatus.COLLABORATING, collaboratingWith: partnerName, collaborationTopic: reason };
                   }
-                  if (e.name.toLowerCase() === partnerName.toLowerCase()) {
-                     return { ...e, status: ExpertStatus.COLLABORATING, collaboratingWith: expert.name };
+                  if (e.name.toLowerCase() === partnerName.toLowerCase() || partnerName.toLowerCase().includes(e.name.toLowerCase())) {
+                     return { ...e, status: ExpertStatus.COLLABORATING, collaboratingWith: expert.name, collaborationTopic: reason };
                   }
                   return e;
                }));
@@ -541,7 +541,7 @@ const App: React.FC = () => {
             // Cleanup collaboration status after chat
             setExperts(prevExperts => prevExperts.map(e => {
                if (e.id === expert.id || e.status === ExpertStatus.COLLABORATING) {
-                  return { ...e, status: ExpertStatus.ACTIVE, collaboratingWith: undefined };
+                  return { ...e, status: ExpertStatus.ACTIVE, collaboratingWith: undefined, collaborationTopic: undefined };
                }
                return e;
             }));
@@ -639,12 +639,12 @@ const App: React.FC = () => {
         setTasks(prev => prev.filter(t => t.id !== nextTask.id)); // Remove completed
         
         // Final sanity check cleanup for the task owner status (in case of error or non-chat tasks)
-        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.ACTIVE, collaboratingWith: undefined } : e));
+        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.ACTIVE, collaboratingWith: undefined, collaborationTopic: undefined } : e));
 
       } catch (error) {
         console.error("Task Failed", error);
         setTasks(prev => prev.map(t => t.id === nextTask.id ? { ...t, status: TaskStatus.FAILED } : t));
-        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.IDLE, collaboratingWith: undefined } : e));
+        setExperts(prev => prev.map(e => e.id === nextTask.expertId ? { ...e, status: ExpertStatus.IDLE, collaboratingWith: undefined, collaborationTopic: undefined } : e));
         addLog(nextTask.expertId, 'System', 'Error', `Task failed: ${nextTask.description}`);
       } finally {
         setIsQueueProcessing(false);
@@ -849,7 +849,8 @@ const App: React.FC = () => {
                        </span>
                     </div>
                     <p className="text-indigo-100 text-sm mt-0.5">
-                      {experts.filter(e => e.status === ExpertStatus.COLLABORATING).map(e => e.name).join(' and ')} are actively collaborating to solve a complex task.
+                      {experts.filter(e => e.status === ExpertStatus.COLLABORATING).map(e => e.name).join(' and ')} are actively collaborating on:
+                      <span className="italic ml-1 font-medium text-white/90">"{experts.find(e => e.status === ExpertStatus.COLLABORATING)?.collaborationTopic || 'Complex Task'}"</span>
                     </p>
                   </div>
                 </div>

@@ -64,7 +64,7 @@ const MetaActionModal: React.FC<MetaActionModalProps> = ({ isOpen, onClose, type
 
   // Loading Animation Loop
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
     if (currentStep === 3) {
       interval = setInterval(() => {
         setLoadingMsgIndex(prev => (prev + 1) % LOADING_MESSAGES.length);
