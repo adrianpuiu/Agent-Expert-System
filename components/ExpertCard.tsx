@@ -1,6 +1,6 @@
 import React from 'react';
 import { Expert, ExpertStatus, ExpertType } from '../types';
-import { Database, Server, Wifi, Layout, Brain, Activity, Eye, Zap, MessageSquare, Upload, Users, Cpu, Network, Cloud, ShieldCheck, Smartphone, TestTube, Palette, BarChart3, Briefcase, FileText, Binary } from 'lucide-react';
+import { Database, Server, Wifi, Layout, Brain, Activity, Eye, Zap, MessageSquare, Upload, Users, Cpu, Network, Cloud, ShieldCheck, Smartphone, TestTube, Palette, BarChart3, Briefcase, FileText, Binary, Globe } from 'lucide-react';
 
 interface ExpertCardProps {
   expert: Expert;
@@ -8,9 +8,10 @@ interface ExpertCardProps {
   onImprove: (expert: Expert) => void;
   onView: (expert: Expert) => void;
   onTrain: (expert: Expert) => void;
+  onResearch: (expert: Expert) => void;
 }
 
-const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onView, onTrain }) => {
+const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onView, onTrain, onResearch }) => {
   
   const getIcon = (type: ExpertType) => {
     switch (type) {
@@ -119,6 +120,14 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
         </button>
         
         <button 
+          onClick={() => onResearch(expert)}
+          className="px-3 py-2 border border-gray-200 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-gray-700 transition-colors"
+          title="Research Topic (Google Search)"
+        >
+          <Globe className="w-4 h-4" />
+        </button>
+
+        <button 
           onClick={() => onTrain(expert)}
           className="px-3 py-2 border border-gray-200 rounded-lg hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 text-gray-700 transition-colors"
           title="Train (Ingest Knowledge)"
@@ -129,7 +138,7 @@ const ExpertCard: React.FC<ExpertCardProps> = ({ expert, onChat, onImprove, onVi
         <button 
           onClick={() => onImprove(expert)}
           disabled={expert.status !== ExpertStatus.IDLE && expert.status !== ExpertStatus.ACTIVE}
-          className="px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-2 border border-gray-200 rounded-lg hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Trigger Self-Improvement"
         >
           <Zap className="w-4 h-4" />

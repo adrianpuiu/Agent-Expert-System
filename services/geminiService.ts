@@ -1,4 +1,4 @@
-import { GoogleGenAI, FunctionDeclaration, Type, Tool, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, FunctionDeclaration, Type, Tool, GenerateContentResponse, Part } from "@google/genai";
 import { Expert, WarRoomMessage, SearchSource, ToolLogData } from '../types';
 
 const getAiClient = () => {
@@ -19,7 +19,8 @@ interface ChatResponse {
 }
 
 // Helper for exponential backoff retry on 429 errors
-const withRetry = async <T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+// Increased retries to 5 and delay to 4000ms to better handle 15 RPM limits (approx 4s recovery)
+const withRetry = async <T>(operation: () => Promise<T>, retries = 5, delay = 4000): Promise<T> => {
   try {
     return await operation();
   } catch (error: any) {
@@ -63,11 +64,12 @@ export const chatWithExpert = async (
   history: { role: string; text: string }[],
   availableExperts: Expert[],
   onCollaborationStart?: (partnerName: string, reason: string) => void,
-  onToolUse?: (data: ToolLogData) => void
+  onToolUse?: (data: ToolLogData) => void,
+  image?: string // Base64 Data URL
 ): Promise<ChatResponse> => {
   try {
     const ai = getAiClient();
-    const model = 'gemini-3-flash-preview';
+    const model = 'gemini-3-flash-preview'; // Supports multimodal
     
     // 1. Prepare Tools
     // Enable Google Search for external grounding
@@ -120,7 +122,16 @@ export const chatWithExpert = async (
       3. CITATION: If you use search, include the library name and version number if found.
       4. GROUNDING: When you use search, incorporate the findings naturally into your response.
       5. If the user asks something outside your domain that fits a colleague's description, use the 'consult_expert' tool.
-      6. Be concise and professional.
+      6. VISUALS: If explaining architecture, data flows, relationships, or timelines, YOU MUST GENERATE A MERMAID DIAGRAM.
+         - Use standard markdown syntax: \`\`\`mermaid ... \`\`\`
+         - Supported types: flowcharts (graph TD/LR), sequence diagrams (sequenceDiagram), class diagrams, ER diagrams (erDiagram), state diagrams, user journeys.
+         - Keep diagrams simple and readable.
+      7. ARTIFACTS: If generating code, SQL schemas, configuration files, or substantial text outputs, use standard markdown code blocks with a filename convention.
+         - Format: \`\`\`language:filename.ext\ncontent\n\`\`\`
+         - Example: \`\`\`typescript:App.tsx\nconst App = () => ...\n\`\`\`
+         - This allows the system to extract them into the "Artifact Workbench" for the user.
+      8. VISION: If an image is provided, analyze it within the context of your expertise (e.g., UX critique, Architecture diagram review, DB schema ERD analysis).
+      9. Be concise and professional.
     `;
 
     // Flatten history for context
@@ -131,10 +142,26 @@ export const chatWithExpert = async (
       User: ${userMessage}
     `;
 
+    // Prepare content parts
+    const parts: Part[] = [{ text: conversationContext }];
+    
+    if (image) {
+      // Extract base64 and mimeType from Data URL
+      const match = image.match(/^data:(.+);base64,(.+)$/);
+      if (match) {
+        parts.push({
+          inlineData: {
+            mimeType: match[1],
+            data: match[2]
+          }
+        });
+      }
+    }
+
     // 2. First Pass: Generate with Tools
     const firstResponse = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
       model,
-      contents: conversationContext,
+      contents: [{ role: 'user', parts: parts }],
       config: { 
         systemInstruction,
         tools: tools
@@ -184,6 +211,7 @@ export const chatWithExpert = async (
           // We keep Google Search enabled here too so it can ground the combined info if needed.
           const collaborationPrompt = `
             ${conversationContext}
+            [IMAGE CONTEXT]: ${image ? "The user also provided an image for analysis." : "No image provided."}
 
             [SYSTEM]: You invoked 'consult_expert' for ${targetExpert.name}.
             Reason: ${reason}
@@ -198,7 +226,7 @@ export const chatWithExpert = async (
 
           const secondResponse = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
             model,
-            contents: collaborationPrompt,
+            contents: collaborationPrompt, // If collab happens, we simplify to text context for the second pass to avoid re-uploading large image data in 'contents' multiple times if not strictly necessary, or we could pass parts again. For safety/speed, text summary is often enough unless the image is CRITICAL to the *collab*. Let's assume text context is sufficient for the synthesis pass.
             config: { 
               systemInstruction, // Maintain persona
               tools: [{ googleSearch: {} }] // Keep search enabled for the synthesis
@@ -296,6 +324,70 @@ export const selfImproveExpert = async (
 
   } catch (error) {
     console.error("Self Improvement Error:", error);
+    throw error;
+  }
+};
+
+export const researchExpert = async (
+  expert: Expert,
+  topic: string,
+  onToolUse?: (data: ToolLogData) => void
+): Promise<{ newExpertise: string; summary: string; sources: SearchSource[] }> => {
+  try {
+    const ai = getAiClient();
+    const model = 'gemini-3-flash-preview';
+
+    const prompt = `
+      You are an Advanced AI Expert Agent specialized in ${expert.type}.
+      Your name is ${expert.name}.
+      
+      Current Mental Model (YAML):
+      \`\`\`yaml
+      ${expert.expertise}
+      \`\`\`
+
+      Research Mission: "${topic}"
+
+      Task:
+      1. Use Google Search to find the most recent documentation, version changes, architectural patterns, or best practices specifically related to the research mission.
+      2. Synthesize this external information with your current knowledge.
+      3. Update your YAML mental model to include this new knowledge. Ensure the new knowledge is structured correctly within the YAML.
+      4. Return JSON:
+         - "newExpertise": The full updated YAML string.
+         - "summary": A concise summary of what was researched and added (e.g. "Updated React Server Components knowledge based on v19 docs").
+    `;
+
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }]
+      }
+    }));
+
+    // Log Search usage
+    const { sources: searchSources, queries: searchQueries } = extractSearchInfo(response);
+    if (searchSources.length > 0 && onToolUse) {
+      onToolUse({
+        toolName: 'googleSearch',
+        input: { topic, queries: searchQueries },
+        output: `Researched ${topic} using ${searchSources.length} sources`
+      });
+    }
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("No response from AI");
+
+    const result = JSON.parse(jsonText);
+    return {
+      newExpertise: result.newExpertise,
+      summary: result.summary,
+      sources: searchSources
+    };
+
+  } catch (error) {
+    console.error("Research Error:", error);
     throw error;
   }
 };
@@ -492,7 +584,8 @@ export const generateGraphData = async (
 export const getWarRoomTurn = async (
   problem: string,
   history: WarRoomMessage[],
-  experts: Expert[]
+  experts: Expert[],
+  forceConsensus: boolean = false
 ): Promise<{ speakerId: string; speakerName: string; content: string; isConsensus: boolean; sources?: SearchSource[] }> => {
   try {
     const ai = getAiClient();
@@ -527,6 +620,7 @@ export const getWarRoomTurn = async (
       5. Keep turns concise (under 50 words unless providing code/schema).
       6. Encourge conflict/correction if an expert is wrong.
       7. Do NOT repeat the same speaker twice in a row unless they are clarifying.
+      ${forceConsensus ? '8. URGENT: The debate has reached its time limit. You MUST now speak as the Moderator. Summarize the discussion, resolve any conflicts, and provide the FINAL authoritative solution/consensus. Set isConsensus to true.' : ''}
     `;
 
     const prompt = `
@@ -534,6 +628,7 @@ export const getWarRoomTurn = async (
       ${transcript}
 
       Task: Generate the next turn.
+      ${forceConsensus ? 'FORCE CONSENSUS MODE: Provide the final summary now.' : ''}
       
       Return JSON:
       {
@@ -571,5 +666,52 @@ export const getWarRoomTurn = async (
       content: 'Communication link disrupted. Ending session.',
       isConsensus: true
     };
+  }
+};
+
+export const generateActionPlan = async (
+  history: { role: string; text: string }[],
+  expert: Expert
+): Promise<{ description: string; priority: string; type: string }[]> => {
+  try {
+    const ai = getAiClient();
+    const model = 'gemini-3-flash-preview';
+
+    const prompt = `
+      Analyze the following conversation history with ${expert.name} (${expert.type}).
+      Extract a list of concrete, actionable tasks that need to be performed based on the discussion.
+      
+      Return a JSON array of objects with the following schema:
+      {
+        "description": "Short description of the task (max 10 words)",
+        "type": "One of: RESEARCH, IMPROVE, TRAIN, CHAT", 
+        "priority": "One of: LOW, MEDIUM, HIGH, CRITICAL"
+      }
+      
+      Rules:
+      - RESEARCH: If the agent needs to investigate a topic.
+      - IMPROVE: If the agent needs to self-correct or optimize its mental model.
+      - TRAIN: If the user provided data that needs to be ingested/memorized.
+      - CHAT: If follow-up discussion is needed.
+      
+      Conversation:
+      ${history.map(c => `${c.role}: ${c.text}`).join('\n')}
+    `;
+
+    const response = await withRetry<GenerateContentResponse>(() => ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    }));
+
+    const jsonText = response.text;
+    if (!jsonText) return [];
+    
+    return JSON.parse(jsonText);
+  } catch (error) {
+    console.error("Action Plan Error:", error);
+    return [];
   }
 };

@@ -43,7 +43,7 @@ export enum TaskStatus {
 export interface AgentTask {
   id: string;
   expertId: string;
-  type: 'CHAT' | 'IMPROVE' | 'TRAIN' | 'COLLABORATION';
+  type: 'CHAT' | 'IMPROVE' | 'TRAIN' | 'COLLABORATION' | 'RESEARCH';
   priority: TaskPriority;
   status: TaskStatus;
   payload: any;
@@ -97,6 +97,7 @@ export interface SearchSource {
 export interface ChatMessage {
   role: 'user' | 'model' | 'system';
   text: string;
+  image?: string; // Base64 Data URL
   timestamp: number;
   sources?: SearchSource[];
 }
